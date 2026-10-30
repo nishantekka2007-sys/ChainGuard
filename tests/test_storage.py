@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+import sqlite3
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -107,6 +108,9 @@ def test_key_rotation_invalidates_old_signatures_and_accepts_new_key(tmp_path):
     old_signature = sign_capability(capability, old_key)
 
     registry.rotate_key("human", new_key.public_key().public_bytes_raw())
+    with sqlite3.connect(database) as connection:
+        history_count = connection.execute("SELECT COUNT(*) FROM identity_key_history").fetchone()[0]
+    assert history_count == 1
     reopened = SQLiteIdentityRegistry(database)
 
     assert not verify_capability_issuer(old_signature, reopened)
@@ -139,3 +143,22 @@ def test_key_rotation_rejects_unknown_identity_and_same_key(tmp_path):
     registry.register("agent-a", public_key)
     with pytest.raises(AuthorizationError, match="must differ"):
         registry.rotate_key("agent-a", public_key)
+
+
+
+def test_store_migrates_existing_identity_table_without_active_column(tmp_path):
+    database = tmp_path / "legacy.sqlite3"
+    key = Ed25519PrivateKey.generate().public_key().public_bytes_raw()
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "CREATE TABLE trusted_identities (identity TEXT PRIMARY KEY, public_key BLOB NOT NULL, registered_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"
+        )
+        connection.execute(
+            "INSERT INTO trusted_identities(identity, public_key) VALUES (?, ?)",
+            ("legacy-agent", key),
+        )
+
+    registry = SQLiteIdentityRegistry(database)
+    assert registry.get_public_key("legacy-agent") == key
+    registry.deactivate("legacy-agent")
+    assert not registry.is_registered("legacy-agent")
