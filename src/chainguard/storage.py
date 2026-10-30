@@ -127,15 +127,20 @@ class SQLiteIdentityRegistry(IdentityRegistry):
                 )
         except sqlite3.IntegrityError as exc:
             raise AuthorizationError("Identity is already registered.") from exc
+        except sqlite3.Error as exc:
+            raise AuthorizationError("Persistent identity state is unavailable.") from exc
 
     def get_public_key(self, identity: str) -> bytes | None:
         if not isinstance(identity, str):
             return None
-        with self.store.connect() as connection:
-            row = connection.execute(
-                "SELECT public_key FROM trusted_identities WHERE identity = ? AND active = 1",
-                (identity.strip(),),
-            ).fetchone()
+        try:
+            with self.store.connect() as connection:
+                row = connection.execute(
+                    "SELECT public_key FROM trusted_identities WHERE identity = ? AND active = 1",
+                    (identity.strip(),),
+                ).fetchone()
+        except sqlite3.Error as exc:
+            raise AuthorizationError("Persistent identity state is unavailable.") from exc
         return bytes(row[0]) if row else None
 
     def is_registered(self, identity: str) -> bool:
