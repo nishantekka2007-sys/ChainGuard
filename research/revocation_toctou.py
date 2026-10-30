@@ -149,7 +149,7 @@ def main() -> None:
         print(rendered)
     else:
         with open(args.output, "w", encoding="utf-8") as output:
-            output.write(rendered + "\\n")
+            output.write(rendered + "\n")
 
 
 if __name__ == "__main__":
