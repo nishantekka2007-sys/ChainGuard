@@ -1,6 +1,8 @@
 from dataclasses import replace
 
 import pytest
+
+from chainguard.core import AuthorizationError
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -98,5 +100,5 @@ def test_signature_bytes_tampering_is_rejected(capability, keypair):
 
 
 def test_signing_requires_ed25519_private_key(capability):
-    with pytest.raises(Exception, match="Ed25519 private key"):
+    with pytest.raises(AuthorizationError, match="Ed25519 private key"):
         sign_capability(capability, object())
