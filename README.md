@@ -71,7 +71,7 @@ The Python gateway now provides a local enforcement boundary for a supplied adap
 ## Security checks performed by the gateway
 
 Before calling the adapter, the gateway verifies:
-1. the complete signed delegation chain;
+1. the complete signed delegation chain and the actor's signed proof of possession;
 2. that the request actor is the final capability subject;
 3. that the requested action and resource are within the final scope;
 4. that audience and workflow match the signed capability context;
