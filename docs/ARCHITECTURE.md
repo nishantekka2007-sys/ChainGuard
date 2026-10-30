@@ -55,7 +55,7 @@ Ed25519 signs a deterministic representation of every authority-bearing field, i
 
 ### Identity registry
 
-Maps principal identifiers to trusted public keys. It is currently in-memory and assumes authenticated enrollment happened outside this prototype.
+Maps principal identifiers to trusted public keys. Both an in-memory registry and a SQLite-backed persistent registry are available. Enrollment is still assumed to be authenticated outside this prototype.
 
 ### Chain verifier
 
@@ -63,11 +63,11 @@ Checks issuer signatures, parent-child relationships, exact ancestry, root conti
 
 ### Revocation registry
 
-Revoking a capability invalidates that capability and descendants whose ancestry contains it. Current state is in-memory and process-local.
+Revoking a capability invalidates that capability and descendants whose ancestry contains it. Both an in-memory registry and a SQLite-backed persistent registry are available. SQLite state can be shared by processes on one host when they use the same database file.
 
 ### Enforcement gateway
 
-The gateway checks the complete chain and verifies an Ed25519-signed action request against the trusted key registered for the claimed actor. It then checks actor, action, resource, audience, workflow, expiry, and revocation state before invoking a tool adapter. It also consumes a unique request ID through a thread-safe, process-local replay guard.
+The gateway checks the complete chain and verifies an Ed25519-signed action request against the trusted key registered for the claimed actor. It then checks actor, action, resource, audience, workflow, expiry, and revocation state before invoking a tool adapter. It also consumes a unique request ID through a thread-safe in-memory guard or a SQLite-backed replay guard shared by processes using the same database.
 
 The gateway consumes a request ID before calling the adapter. If the adapter fails after invocation, the ID remains consumed. This is an at-most-once attempt policy, not exactly-once delivery. External adapters need their own idempotency protocol for uncertain outcomes.
 
@@ -81,7 +81,7 @@ The gateway consumes a request ID before calling the adapter. If the adapter fai
 6. Check signed audience and workflow binding.
 7. Check expiry.
 8. Check revocation closure.
-9. Atomically consume the request ID within this process.
+9. Atomically consume the request ID in the configured replay store.
 10. Invoke the adapter.
 
 The adapter must execute exactly the action/resource represented by the authorized request. It must not reinterpret an authorized request as a broader operation.
@@ -120,3 +120,10 @@ The current replay guard is process-local. Multiple gateway instances do not sha
 - Make decisions explainable and auditable.
 - Keep the core framework-independent.
 - State assumptions with every security claim.
+
+
+## 8. Persistent single-host state
+
+`chainguard.storage` provides `SQLiteIdentityRegistry`, `SQLiteRevocationRegistry`, and `SQLiteReplayGuard`. They share a SQLite database file and preserve records across process restarts. SQLite uniqueness constraints reject duplicate identity registrations and request IDs even when multiple local processes race.
+
+This is durable, single-host persistence—not a distributed consistency protocol. Do not assume an arbitrary network filesystem provides safe multi-host coordination. The database does not contain agent private keys. It also does not make a revocation check and an external tool side effect one atomic transaction.
