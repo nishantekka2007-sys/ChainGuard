@@ -1,8 +1,6 @@
 """Fail-closed enforcement boundary for protected tool operations.
 
-This first gateway is synchronous and process-local. Replay state and
-revocation checks are not distributed or transactionally coupled to external
-tool execution; see the project limitations.
+The gateway is synchronous. Its default replay and revocation path is process-local; optional SQLite-backed stores support single-host persistence. SQLiteAdmissionCoordinator can serialize admission against revocation writes on one host, but does not make external tool execution atomic or provide dispatch-time fencing.
 """
 
 from dataclasses import dataclass
