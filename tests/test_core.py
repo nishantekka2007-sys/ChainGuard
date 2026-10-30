@@ -110,3 +110,20 @@ def test_rejects_empty_or_invalid_scope(root_capability, actions, resources):
 def test_capability_is_immutable(root_capability):
     with pytest.raises(AttributeError):
         root_capability.subject = "attacker"
+
+
+def test_delegation_inherits_context_and_cannot_extend_expiry():
+    root = issue_root_capability(
+        "human-001",
+        "agent-a",
+        {"read", "summarize"},
+        {"report-001"},
+        audience="report-service",
+        workflow_id="review-2026",
+        expires_at=2_000_000_000,
+    )
+    child = delegate(root, "agent-a", "agent-b", {"read"}, {"report-001"})
+
+    assert child.audience == root.audience
+    assert child.workflow_id == root.workflow_id
+    assert child.expires_at == root.expires_at
