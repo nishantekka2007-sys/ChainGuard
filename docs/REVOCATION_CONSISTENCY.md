@@ -1,6 +1,6 @@
 # Revocation Consistency Contract
 
-**Status:** Design decision required; no stronger guarantee is implemented  
+**Status:** Admission ordering selected and implemented as an optional single-host SQLite mode  
 **Related experiment:** [Revocation TOCTOU](REVOCATION_TOCTOU.md)
 
 ## 1. Why this contract is necessary
@@ -52,9 +52,9 @@ The current implementation provides a point-in-time gateway check only:
 
 Therefore the prototype currently satisfies neither a demonstrated dispatch-ordering guarantee nor a completion barrier under concurrent revocation.
 
-## 5. Decision required before mitigation
+## 5. Selected prototype contract: admission ordering
 
-The research team must select the required contract for a stated deployment model:
+For the current research prototype, select Contract A (admission ordering) for the explicitly limited single-host SQLite deployment. Contract B and Contract C remain future research work. The deployment assumptions are:
 
 | Question | Why it matters |
 |---|---|
@@ -65,7 +65,7 @@ The research team must select the required contract for a stated deployment mode
 | Can the protected service validate a token/epoch itself? | Determines whether enforcement can be placed at the actual side-effect boundary |
 | What happens when the service is unavailable or its outcome is unknown? | Defines fail-closed behavior, retries, and idempotency |
 
-Do not implement a lock, transaction, or epoch mechanism until these answers are explicit. Each candidate should be evaluated against the same event ordering and tested at the real adapter/service boundary.
+The optional SQLiteAdmissionCoordinator implements Contract A by checking revocation lineage and consuming the request ID inside one BEGIN IMMEDIATE transaction. This is serialized against revocation writes using the same database. It does not establish Contract B or Contract C. Each stronger candidate still requires tests at the actual protected-service boundary.
 
 ## 6. Minimum falsification tests
 
@@ -85,3 +85,8 @@ Record R, A, D, S, and C ordering, whether the side effect began, whether it com
 ## 7. Research boundary
 
 This contract is a design and evaluation framework, not a claim that any candidate mechanism has been implemented or proven. Results must state the selected contract, deployment assumptions, service boundary, and tested failure modes.
+
+
+## 8. Implementation reference
+
+See [REVOCATION_ADMISSION.md](REVOCATION_ADMISSION.md) for the implemented SQLite admission contract, configuration requirements, and deterministic tests.
