@@ -67,4 +67,4 @@ No mitigation is implemented by this experiment. A future change should first de
 
 ## Reproducibility and limitations
 
-The script generates fresh Ed25519 keys for each run and uses a fixed clock and local in-memory registries. It reports a small JSON result. It is a deterministic regression/research demonstration, not a throughput benchmark, statistical race estimate, distributed-systems proof, or security certification.
+The script generates fresh Ed25519 keys for each run and uses a fixed clock and local in-memory registries. A separate persistent-storage integration test repeats the late-revocation interleaving with SQLite-backed identity and revocation registries, using a second SQLite registry instance to commit the revoke. This confirms the ordering gap is not specific to the in-memory registry implementation. It remains a single-host deterministic test, not a distributed-systems experiment. The script reports a small JSON result. It is a deterministic regression/research demonstration, not a throughput benchmark, statistical race estimate, distributed-systems proof, or security certification.
