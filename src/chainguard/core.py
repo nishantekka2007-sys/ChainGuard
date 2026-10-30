@@ -24,6 +24,7 @@ class Capability:
     actions: frozenset[str]
     resources: frozenset[str]
     parent_id: str | None = None
+    ancestor_ids: tuple[str, ...] = ()
 
 
 def _validated_scope(values: set[str], field_name: str) -> frozenset[str]:
@@ -97,4 +98,5 @@ def delegate(
         actions=requested_actions,
         resources=requested_resources,
         parent_id=parent.capability_id,
+        ancestor_ids=parent.ancestor_ids + (parent.capability_id,),
     )
