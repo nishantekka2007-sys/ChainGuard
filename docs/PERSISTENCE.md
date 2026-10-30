@@ -39,7 +39,8 @@ The same database path must be supplied to all three stores. Use a local filesys
 
 | State | SQLite table | Behavior |
 |---|---|---|
-| Trusted public keys | `trusted_identities` | Identity registration survives restart; duplicate IDs are rejected; active state is checked on lookup |\n| Key rotation history | `identity_key_history` | Records old and replacement public keys for audit; private keys are never stored |
+| Trusted public keys | `trusted_identities` | Identity registration survives restart; duplicate IDs are rejected; active state is checked on lookup |
+| Key rotation history | `identity_key_history` | Records old and replacement public keys for audit; private keys are never stored |
 | Revoked capability IDs | `revoked_capabilities` | Revocation survives restart and invalidates descendants |
 | Consumed request IDs | `consumed_requests` | Duplicate IDs are rejected across gateway instances sharing the database |
 
