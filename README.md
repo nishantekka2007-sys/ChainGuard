@@ -66,7 +66,8 @@ The Python gateway now provides a local enforcement boundary for a supplied adap
 | Distributed multi-host identity and revocation | Planned |
 | Distributed replay/idempotency and multi-host consistency | Planned |
 | Production tool adapters and infrastructure bypass prevention | Planned |
-| Structured audit trail and adversarial benchmark | Planned |
+| Initial synthetic baseline benchmark | Implemented |
+| Broad adversarial benchmark and structured audit trail | Planned |
 
 ## Security checks performed by the gateway
 
@@ -103,6 +104,7 @@ See [Architecture](docs/ARCHITECTURE.md) for the design and [Threat Model](docs/
 - [Security properties](docs/SECURITY_PROPERTIES.md) — properties and falsification tests.
 - [Research proposal](docs/RESEARCH_PROPOSAL.md) — question, hypothesis, contributions, and method.
 - [Experiment plan](docs/EXPERIMENT_PLAN.md) — baselines, attack suite, metrics, and controls.
+- [Benchmark guide](docs/BENCHMARK.md) — run the initial reproducible synthetic baseline comparison.
 - [Limitations](docs/LIMITATIONS.md) — current gaps, residual risks, and claim discipline.
 - [Security policy](SECURITY.md) — responsible vulnerability reporting.
 - [Contributing](CONTRIBUTING.md) — development and security-test expectations.
