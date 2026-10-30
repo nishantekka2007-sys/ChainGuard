@@ -4,7 +4,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from chainguard.core import AuthorizationError, delegate, issue_root_capability
-from chainguard.gateway import ActionRequest, EnforcementGateway
+from chainguard.gateway import ActionRequest, EnforcementGateway, sign_action_request
 from chainguard.identity import IdentityRegistry
 from chainguard.integrity import sign_capability
 from chainguard.revocation import RevocationRegistry
@@ -45,11 +45,11 @@ def environment():
     gateway = EnforcementGateway(
         identities, revocations, clock=lambda: 1_900_000_000
     )
-    return gateway, identities, revocations, root, child, chain
+    return gateway, identities, revocations, root, child, chain, agent_b_key
 
 
-def valid_request(request_id="request-001"):
-    return ActionRequest(
+def valid_request(request_id="request-001", **changes):
+    request = ActionRequest(
         request_id=request_id,
         actor="agent-b",
         action="read",
@@ -57,13 +57,18 @@ def valid_request(request_id="request-001"):
         audience="report-service",
         workflow_id="quarterly-review",
     )
+    return replace(request, **changes)
+
+
+def signed_request(agent_key, request_id="request-001", **changes):
+    return sign_action_request(valid_request(request_id, **changes), agent_key)
 
 
 def test_gateway_executes_valid_authorized_request(environment):
-    gateway, _, _, _, _, chain = environment
+    gateway, _, _, _, _, chain, agent_b_key = environment
     adapter = RecordingAdapter()
 
-    result = gateway.execute(chain, valid_request(), adapter)
+    result = gateway.execute(chain, signed_request(agent_b_key), adapter)
 
     assert result == {"executed": "read", "resource": "report-1"}
     assert len(adapter.calls) == 1
@@ -74,7 +79,7 @@ def test_gateway_rejects_action_escalation_before_execution(environment):
     adapter = RecordingAdapter()
 
     with pytest.raises(AuthorizationError, match="outside"):
-        gateway.execute(chain, replace(valid_request(), action="delete"), adapter)
+        gateway.execute(chain, signed_request(agent_b_key, action="delete"), adapter)
 
     assert adapter.calls == []
 
@@ -84,7 +89,7 @@ def test_gateway_rejects_resource_escalation_before_execution(environment):
     adapter = RecordingAdapter()
 
     with pytest.raises(AuthorizationError, match="outside"):
-        gateway.execute(chain, replace(valid_request(), resource="payroll"), adapter)
+        gateway.execute(chain, signed_request(agent_b_key, resource="payroll"), adapter)
 
     assert adapter.calls == []
 
@@ -92,7 +97,7 @@ def test_gateway_rejects_resource_escalation_before_execution(environment):
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
-        ("actor", "agent-a", "actor"),
+        ("actor", "agent-a", "signature or actor identity"),
         ("audience", "payment-service", "audience"),
         ("workflow_id", "different-workflow", "workflow"),
     ],
@@ -102,13 +107,13 @@ def test_gateway_rejects_context_mismatch(environment, field, value, message):
     adapter = RecordingAdapter()
 
     with pytest.raises(AuthorizationError, match=message):
-        gateway.execute(chain, replace(valid_request(), **{field: value}), adapter)
+        gateway.execute(chain, signed_request(agent_b_key, **{field: value}), adapter)
 
     assert adapter.calls == []
 
 
 def test_gateway_rejects_expired_capability(environment):
-    _, identities, revocations, _, _, chain = environment
+    _, identities, revocations, _, _, chain, agent_b_key = environment
     expired_gateway = EnforcementGateway(
         identities, revocations, clock=lambda: 2_000_000_000
     )
@@ -121,7 +126,7 @@ def test_gateway_rejects_expired_capability(environment):
 
 
 def test_gateway_rejects_revoked_ancestor(environment):
-    gateway, _, revocations, root, _, chain = environment
+    gateway, _, revocations, root, _, chain, agent_b_key = environment
     revocations.revoke(root)
     adapter = RecordingAdapter()
 
@@ -171,7 +176,7 @@ def test_gateway_rejects_capability_without_execution_context():
     )
 
     with pytest.raises(AuthorizationError, match="audience"):
-        gateway.execute(chain, request, adapter)
+        gateway.execute(chain, sign_action_request(request, agent_key), adapter)
 
     assert adapter.calls == []
 
@@ -202,7 +207,7 @@ def test_concurrent_replay_allows_only_one_adapter_execution(environment):
 
     def attempt():
         try:
-            gateway.execute(chain, valid_request("concurrent-request"), adapter)
+            gateway.execute(chain, signed_request(agent_b_key, "concurrent-request"), adapter)
             return "allowed"
         except AuthorizationError:
             return "rejected"
