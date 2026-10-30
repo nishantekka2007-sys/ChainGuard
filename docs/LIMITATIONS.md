@@ -7,11 +7,11 @@ This document is intentionally explicit. A security prototype is more credible w
 - The default identity registry is in-memory. A SQLite-backed persistent registry is available, but enrollment still assumes an external trusted process.
 - The default revocation registry is in-memory. SQLite-backed revocation records persist across restarts and can be shared by local processes using one database file.
 - The default replay guard is process-local. A SQLite-backed replay guard provides durable single-host state shared by processes using one database file; it is not a distributed multi-host service.
-- Revocation is a point-in-time check. A controlled interleaving demonstrates that a capability can be revoked after `require_active()` returns but before the adapter is called, and the current gateway can still invoke that adapter. See [Revocation TOCTOU experiment](REVOCATION_TOCTOU.md) and [Revocation consistency contract](REVOCATION_CONSISTENCY.md).
+- The default gateway path performs a point-in-time revocation check and has the demonstrated TOCTOU gap. The optional SQLiteAdmissionCoordinator serializes admission and revocation writes on one host; a request admitted first may still execute or complete after a later revoke. See [Revocation admission semantics](REVOCATION_ADMISSION.md).
 - Revocation checks and external tool execution are not one atomic transaction.
 - The gateway is a local Python boundary; infrastructure-level exclusivity and bypass prevention are not established.
 - The adapter contract receives a minimal action/resource request; real adapters must enforce exact operation semantics and safe parameter handling.
-- No production key-management service, key rotation, or key deactivation exists.
+- Key lifecycle operations exist in the prototype, but there is no production KMS/HSM integration, secure private-key storage, automated recovery, or automatic re-signing/reissuance of capabilities after key rotation.
 - No durable audit trail or complete adversarial benchmark exists.
 - The implementation has not been formally verified.
 
