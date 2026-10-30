@@ -92,7 +92,7 @@ python -m pip install -e ".[dev]"
 pytest -v
 ```
 
-See [Architecture](docs/ARCHITECTURE.md) for the design and [Threat Model](docs/THREAT_MODEL.md) for assumptions.
+See [Architecture](docs/ARCHITECTURE.md) for the design and [Threat Model](docs/THREAT_MODEL.md) for assumptions. A runnable educational example is available at [examples/minimal_gateway.py](examples/minimal_gateway.py).
 
 ## Research and design documents
 
