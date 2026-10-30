@@ -150,6 +150,7 @@ class EnforcementGateway:
         *,
         replay_guard: ReplayGuard | None = None,
         clock: Callable[[], float] = time.time,
+        admission_coordinator: object | None = None,
     ) -> None:
         if not isinstance(identity_registry, IdentityRegistry):
             raise AuthorizationError("A trusted identity registry is required.")
@@ -161,6 +162,9 @@ class EnforcementGateway:
         self._revocations = revocation_registry
         self._replay = replay_guard if replay_guard is not None else ReplayGuard()
         self._clock = clock
+        if admission_coordinator is not None and not callable(getattr(admission_coordinator, "admit", None)):
+            raise AuthorizationError("A valid admission coordinator is required.")
+        self._admission_coordinator = admission_coordinator
 
     def execute(
         self,
@@ -202,10 +206,15 @@ class EnforcementGateway:
         if self._clock() >= capability.expires_at:
             raise AuthorizationError("Capability has expired.")
 
-        try:
-            self._revocations.require_active(capability)
-        except AuthorizationError as exc:
-            raise AuthorizationError("Capability is revoked or inactive.") from exc
+        if self._admission_coordinator is not None:
+            # Admission and revocation are serialized by the shared coordinator.
+            # A request admitted first may still complete after a later revoke.
+            self._admission_coordinator.admit(capability, request.request_id)
+        else:
+            try:
+                self._revocations.require_active(capability)
+            except AuthorizationError as exc:
+                raise AuthorizationError("Capability is revoked or inactive.") from exc
+            self._replay.consume(request.request_id)
 
-        self._replay.consume(request.request_id)
         return adapter.execute(request)
