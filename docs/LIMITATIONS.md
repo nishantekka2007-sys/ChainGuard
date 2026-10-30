@@ -6,15 +6,15 @@ This document is intentionally explicit. A security prototype is more credible w
 
 - The identity registry is in-memory and assumes trusted enrollment.
 - The revocation registry is in-memory and process-local.
-- There is no runtime gateway enforcing decisions before real tool execution.
-- There is no persistent or distributed revocation consistency model.
-- There is no capability expiry, nonce, request identifier, audience, tenant, or workflow binding.
-- There is no durable replay/idempotency store.
-- There is no key rotation, key deactivation, or production key-management integration.
-- The implementation has not yet been formally verified.
-- The current test suite is not a comprehensive adversarial benchmark.
+- The replay guard is thread-safe only within one process; it has no durable or distributed state.
+- Revocation checks and external tool execution are not one atomic transaction.
+- The gateway is a local Python boundary; infrastructure-level exclusivity and bypass prevention are not established.
+- The adapter contract receives a minimal action/resource request; real adapters must enforce exact operation semantics and safe parameter handling.
+- No production key-management service, key rotation, or key deactivation exists.
+- No durable audit trail or complete adversarial benchmark exists.
+- The implementation has not been formally verified.
 
-## Security limits that remain even after planned work
+## Security limits
 
 - A compromised agent may misuse actions and resources it legitimately possesses.
 - An overbroad human root grant remains overbroad unless separate policy limits root authority.
@@ -23,18 +23,20 @@ This document is intentionally explicit. A security prototype is more credible w
 - A compromised underlying service or host can bypass application-level assumptions.
 - Direct tool credentials outside the gateway defeat enforcement completeness.
 - Individually authorized data access can still create disclosure through aggregation or inference.
-- Prompt injection is not directly prevented; the system aims to constrain downstream execution authority.
+- Prompt injection is not directly prevented; ChainGuard aims to constrain downstream execution authority.
 
 ## Operational trade-offs
 
-Fail-closed checks improve protection when trust or revocation state is unavailable, but reduce availability. Persistent and distributed revocation introduces consistency and latency trade-offs. Stronger context binding can reduce accidental reuse but requires careful lifecycle management for tasks and workflows.
+Fail-closed checks improve protection when authorization state is unavailable, but reduce availability. Distributed revocation introduces consistency and latency trade-offs. Replay prevention requires durable retention and careful idempotency semantics in a multi-instance deployment.
+
+The local gateway consumes a request ID before invoking an adapter. If the adapter fails after receiving the request, the ID remains consumed. This avoids blind duplicate attempts but cannot determine whether a remote side effect occurred. Exactly-once execution requires cooperation from the underlying service, usually through idempotency keys and transactional semantics.
 
 ## Claim discipline
 
-Use language such as:
-- "the prototype rejects the tested privilege-escalation cases";
-- "the gateway enforces the specified policy under the stated trust assumptions";
-- "the experiment observed no successful attacks in this test set."
+Use precise language:
+- "the prototype rejected the tested privilege-escalation requests";
+- "the local gateway enforced the specified checks in the tested configuration";
+- "the experiment observed no successful attacks in this finite test set."
 
 Avoid unsupported language such as:
 - "unhackable";
@@ -45,4 +47,4 @@ Avoid unsupported language such as:
 
 ## Production readiness
 
-Do not deploy the current prototype to protect real accounts, funds, secrets, or production systems. Production use would require independent security review, hardened identity and key management, durable revocation, secure deployment architecture, service-side bypass prevention, operational monitoring, incident response, and a formal risk assessment.
+Do not deploy the current prototype to protect real accounts, funds, secrets, or production systems. Production use requires independent security review, hardened identity and key management, durable distributed revocation and replay protection, service-side bypass prevention, robust adapters, operational monitoring, incident response, and a formal risk assessment.
