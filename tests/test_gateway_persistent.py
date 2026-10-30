@@ -96,3 +96,48 @@ def test_gateway_observes_revocation_after_reopening_database(tmp_path):
     with pytest.raises(AuthorizationError, match="revoked"):
         gateway.execute(chain, signed_request, adapter)
     assert adapter.calls == 0
+
+
+def test_sqlite_revocation_can_race_after_gateway_check_before_adapter(tmp_path):
+    """Persistent single-host revocation has the same check/use ordering gap."""
+    from chainguard.gateway import ReplayGuard
+
+    database = tmp_path / "race.sqlite3"
+    human_key = Ed25519PrivateKey.generate()
+    agent_key = Ed25519PrivateKey.generate()
+    identities = SQLiteIdentityRegistry(database)
+    identities.register("human", human_key.public_key().public_bytes_raw())
+    identities.register("agent", agent_key.public_key().public_bytes_raw())
+
+    capability = issue_root_capability(
+        "human", "agent", {"read"}, {"report"},
+        audience="report-service", workflow_id="persistent-toctou",
+        expires_at=2_000_000_000,
+    )
+    chain = (sign_capability(capability, human_key),)
+    revocations = SQLiteRevocationRegistry(database)
+
+    class RevokeAfterActiveCheck(ReplayGuard):
+        def consume(self, request_id):
+            super().consume(request_id)
+            # The gateway invokes consume only after require_active() returns.
+            SQLiteRevocationRegistry(database).revoke(capability)
+
+    gateway = EnforcementGateway(
+        SQLiteIdentityRegistry(database),
+        revocations,
+        replay_guard=RevokeAfterActiveCheck(),
+        clock=lambda: 1_900_000_000,
+    )
+    request = sign_action_request(
+        ActionRequest(
+            "persistent-late-revoke", "agent", "read", "report",
+            "report-service", "persistent-toctou",
+        ),
+        agent_key,
+    )
+    adapter = CountingAdapter()
+
+    assert gateway.execute(chain, request, adapter) == "executed"
+    assert SQLiteRevocationRegistry(database).is_revoked(capability)
+    assert adapter.calls == 1
