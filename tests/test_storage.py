@@ -4,6 +4,8 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from chainguard.core import AuthorizationError, delegate, issue_root_capability
+from chainguard.integrity import sign_capability
+from chainguard.verification import verify_capability_issuer
 from chainguard.storage import (
     SQLiteIdentityRegistry,
     SQLiteReplayGuard,
@@ -92,3 +94,48 @@ def test_store_rejects_memory_database_for_multi_connection_state():
 
     with pytest.raises(AuthorizationError, match="database file path"):
         SQLiteStateStore(":memory:")
+
+
+
+def test_key_rotation_invalidates_old_signatures_and_accepts_new_key(tmp_path):
+    database = tmp_path / "state.sqlite3"
+    old_key = Ed25519PrivateKey.generate()
+    new_key = Ed25519PrivateKey.generate()
+    registry = SQLiteIdentityRegistry(database)
+    registry.register("human", old_key.public_key().public_bytes_raw())
+    capability = issue_root_capability("human", "agent-a", {"read"}, {"report"})
+    old_signature = sign_capability(capability, old_key)
+
+    registry.rotate_key("human", new_key.public_key().public_bytes_raw())
+    reopened = SQLiteIdentityRegistry(database)
+
+    assert not verify_capability_issuer(old_signature, reopened)
+    assert verify_capability_issuer(sign_capability(capability, new_key), reopened)
+
+
+def test_deactivated_identity_cannot_verify_existing_capabilities(tmp_path):
+    database = tmp_path / "state.sqlite3"
+    key = Ed25519PrivateKey.generate()
+    registry = SQLiteIdentityRegistry(database)
+    registry.register("human", key.public_key().public_bytes_raw())
+    capability = issue_root_capability("human", "agent-a", {"read"}, {"report"})
+    signed = sign_capability(capability, key)
+
+    registry.deactivate("human")
+
+    assert not registry.is_registered("human")
+    assert registry.get_public_key("human") is None
+    assert not verify_capability_issuer(signed, SQLiteIdentityRegistry(database))
+
+
+def test_key_rotation_rejects_unknown_identity_and_same_key(tmp_path):
+    registry = SQLiteIdentityRegistry(tmp_path / "state.sqlite3")
+    key = Ed25519PrivateKey.generate()
+    public_key = key.public_key().public_bytes_raw()
+
+    with pytest.raises(AuthorizationError, match="not registered"):
+        registry.rotate_key("unknown", public_key)
+
+    registry.register("agent-a", public_key)
+    with pytest.raises(AuthorizationError, match="must differ"):
+        registry.rotate_key("agent-a", public_key)
