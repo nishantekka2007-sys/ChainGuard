@@ -90,6 +90,7 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install -e ".[dev]"
 pytest -v
+python examples/minimal_gateway.py
 ```
 
 See [Architecture](docs/ARCHITECTURE.md) for the design and [Threat Model](docs/THREAT_MODEL.md) for assumptions. A runnable educational example is available at [examples/minimal_gateway.py](examples/minimal_gateway.py).
@@ -102,6 +103,8 @@ See [Architecture](docs/ARCHITECTURE.md) for the design and [Threat Model](docs/
 - [Research proposal](docs/RESEARCH_PROPOSAL.md) — question, hypothesis, contributions, and method.
 - [Experiment plan](docs/EXPERIMENT_PLAN.md) — baselines, attack suite, metrics, and controls.
 - [Limitations](docs/LIMITATIONS.md) — current gaps, residual risks, and claim discipline.
+- [Security policy](SECURITY.md) — responsible vulnerability reporting.
+- [Contributing](CONTRIBUTING.md) — development and security-test expectations.
 
 ## Security and responsible use
 
