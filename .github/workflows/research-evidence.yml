@@ -1,0 +1,78 @@
+name: ChainGuard Research Evidence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "research/**"
+      - "src/chainguard/**"
+      - "tests/**"
+      - ".github/workflows/research-evidence.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "research/**"
+      - "src/chainguard/**"
+      - "tests/**"
+      - ".github/workflows/research-evidence.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    name: Generate reproducible research evidence
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Generate benchmark and revocation experiment outputs
+        run: |
+          mkdir -p research-artifacts
+          python -m research.benchmark --trials 100 --output research-artifacts/benchmark.json
+          python -m research.revocation_toctou --output research-artifacts/revocation-toctou.json
+
+      - name: Record execution environment
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          python - <<'PY'
+          import json
+          import platform
+          import sys
+          import cryptography
+
+          metadata = {
+              "commit_sha": __import__("os").environ["COMMIT_SHA"],
+              "github_run_id": __import__("os").environ["RUN_ID"],
+              "github_run_attempt": __import__("os").environ["RUN_ATTEMPT"],
+              "python_version": sys.version,
+              "platform": platform.platform(),
+              "machine": platform.machine(),
+              "cryptography_version": cryptography.__version__,
+          }
+          with open("research-artifacts/environment.json", "w", encoding="utf-8") as f:
+              json.dump(metadata, f, indent=2, sort_keys=True)
+              f.write("\\n")
+          PY
+
+      - name: Upload machine-readable research evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: chainguard-research-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: research-artifacts/
+          if-no-files-found: error
+          retention-days: 90
