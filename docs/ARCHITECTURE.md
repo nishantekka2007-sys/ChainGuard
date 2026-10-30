@@ -55,7 +55,7 @@ Ed25519 signs a deterministic representation of every authority-bearing field, i
 
 ### Identity registry
 
-Maps principal identifiers to trusted public keys. Both an in-memory registry and a SQLite-backed persistent registry are available. Enrollment is still assumed to be authenticated outside this prototype.
+Maps principal identifiers to trusted public keys. Both an in-memory registry and a SQLite-backed persistent registry are available. The SQLite registry supports explicit key rotation and deactivation, with public-key history. Enrollment is still assumed to be authenticated outside this prototype.
 
 ### Chain verifier
 
@@ -127,3 +127,8 @@ The current replay guard is process-local. Multiple gateway instances do not sha
 `chainguard.storage` provides `SQLiteIdentityRegistry`, `SQLiteRevocationRegistry`, and `SQLiteReplayGuard`. They share a SQLite database file and preserve records across process restarts. SQLite uniqueness constraints reject duplicate identity registrations and request IDs even when multiple local processes race.
 
 This is durable, single-host persistence—not a distributed consistency protocol. Do not assume an arbitrary network filesystem provides safe multi-host coordination. The database does not contain agent private keys. It also does not make a revocation check and an external tool side effect one atomic transaction.
+
+
+## 9. Identity key lifecycle
+
+The SQLite identity registry can rotate an identity's active public key or deactivate the identity. Rotation is transactional and invalidates signatures made with the previous key at subsequent verification time. Deactivation removes the key from active lookup. The registry records public-key rotation history but never stores private keys. This is not a KMS/HSM or authenticated enrollment system.
