@@ -1,0 +1,87 @@
+# Revocation Consistency Contract
+
+**Status:** Design decision required; no stronger guarantee is implemented  
+**Related experiment:** [Revocation TOCTOU](REVOCATION_TOCTOU.md)
+
+## 1. Why this contract is necessary
+
+The gateway currently checks revocation and later invokes an adapter. A revoke can commit between those events. The deterministic experiment demonstrates that the gateway may still invoke the adapter in that interleaving.
+
+The phrase "revocation is immediate" is therefore too vague to be a testable security requirement. The system must define which event revocation orders against: request admission, side-effect dispatch, or side-effect completion.
+
+## 2. Events and terminology
+
+For one protected operation, distinguish these events:
+
+- **Revoke commit (R):** the authoritative revocation state change has committed.
+- **Authorization check (A):** the gateway reads revocation state and observes the capability as active.
+- **Admission (D):** the gateway accepts the request for processing.
+- **Side-effect start (S):** the protected service begins the externally visible operation.
+- **Completion (C):** the protected service reports the operation complete.
+
+These events are not interchangeable. In particular, adapter invocation is not necessarily the same as side-effect start or completion.
+
+## 3. Candidate consistency contracts
+
+### Contract A — Admission ordering
+
+A request admitted before R may complete. A request admitted after R must be rejected, assuming it reads authoritative, sufficiently fresh revocation state.
+
+This contract is implementable with a well-defined serialization point for admission and revocation. It does **not** promise that no side effect starts after R: a request admitted earlier may be queued and dispatched later.
+
+### Contract B — Dispatch ordering
+
+A protected service must reject an operation whose authorization epoch is older than the latest committed revocation epoch at the service's side-effect boundary. Thus, if R precedes S in the service's serialization order, the side effect must not start.
+
+This requires the protected service (or a trusted enforcement component immediately controlling it) to validate a fencing/version token at the point where it can serialize that check against the side effect. A gateway-only lock or pre-dispatch database check cannot establish this across independent processes or remote services.
+
+### Contract C — Completion barrier
+
+After R returns successfully, no operation covered by that revocation may remain in flight or complete later.
+
+This is stronger than dispatch ordering. It requires tracking and draining or cancelling already-started operations, plus defined behavior for irreversible external effects. It may be impossible for some tools and services. Do not claim it without service-specific cancellation and completion semantics.
+
+## 4. Current prototype guarantee
+
+The current implementation provides a point-in-time gateway check only:
+
+- If revocation is visible when the gateway checks, the request is rejected.
+- If revocation commits after that check, the in-flight request may still reach the adapter.
+- SQLite persistence does not close this gap; a transaction in the revocation store cannot make an unrelated adapter side effect atomic.
+- No distributed freshness, fencing, cancellation, or completion barrier is currently established.
+
+Therefore the prototype currently satisfies neither a demonstrated dispatch-ordering guarantee nor a completion barrier under concurrent revocation.
+
+## 5. Decision required before mitigation
+
+The research team must select the required contract for a stated deployment model:
+
+| Question | Why it matters |
+|---|---|
+| Is an already-admitted request allowed to finish? | Separates admission ordering from stronger semantics |
+| Must revocation prevent a side effect that has not started? | Requires dispatch-time serialization or service-side fencing |
+| Must revocation wait for or cancel operations already started? | Requires completion tracking and possibly cancellation |
+| Is the state single-process, single-host, or multi-host? | Determines whether local locks or SQLite can coordinate all actors |
+| Can the protected service validate a token/epoch itself? | Determines whether enforcement can be placed at the actual side-effect boundary |
+| What happens when the service is unavailable or its outcome is unknown? | Defines fail-closed behavior, retries, and idempotency |
+
+Do not implement a lock, transaction, or epoch mechanism until these answers are explicit. Each candidate should be evaluated against the same event ordering and tested at the real adapter/service boundary.
+
+## 6. Minimum falsification tests
+
+For whichever contract is selected, add deterministic tests for:
+
+1. Revoke commits before authorization check.
+2. Revoke commits after authorization check but before admission completes.
+3. Revoke commits after admission but before dispatch.
+4. Revoke races with side-effect start at the protected service.
+5. Revoke occurs after side-effect start but before completion.
+6. Two gateway processes observe the same revocation state.
+7. The revocation store or protected service is unavailable.
+8. A retry follows an unknown or timed-out side-effect outcome.
+
+Record R, A, D, S, and C ordering, whether the side effect began, whether it completed, and whether the caller received a definitive result. A denied gateway response alone is not sufficient evidence if the side effect may already have occurred.
+
+## 7. Research boundary
+
+This contract is a design and evaluation framework, not a claim that any candidate mechanism has been implemented or proven. Results must state the selected contract, deployment assumptions, service boundary, and tested failure modes.
