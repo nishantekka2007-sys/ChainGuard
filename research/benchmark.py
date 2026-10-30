@@ -11,7 +11,6 @@ import json
 import statistics
 import time
 from dataclasses import dataclass
-from typing import Callable
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -123,6 +122,7 @@ def _authorize(
     trial: Trial,
     identities: IdentityRegistry,
     iteration: int,
+    actor_private_key: Ed25519PrivateKey,
 ) -> bool:
     leaf = trial.chain[-1]
     capability = leaf.capability
@@ -153,7 +153,7 @@ def _authorize(
         )
         signed = sign_action_request(
             request_with_unique_id,
-            _actor_private_key_for_benchmark,
+            actor_private_key,
         )
         try:
             gateway.execute(trial.chain, signed, _NoOpAdapter())
@@ -177,8 +177,6 @@ def run_benchmark(trials: int = 100) -> dict[str, object]:
         raise ValueError("trials must be a positive integer")
 
     identities, actor_key, scenarios = build_trials()
-    global _actor_private_key_for_benchmark
-    _actor_private_key_for_benchmark = actor_key
 
     baselines = (
         "B0_no_enforcement",
@@ -194,7 +192,7 @@ def run_benchmark(trials: int = 100) -> dict[str, object]:
             accepted = 0
             for iteration in range(trials):
                 start = time.perf_counter_ns()
-                allowed = _authorize(baseline, scenario, identities, iteration)
+                allowed = _authorize(baseline, scenario, identities, iteration, actor_key)
                 durations.append((time.perf_counter_ns() - start) / 1_000_000)
                 accepted += int(allowed)
 
