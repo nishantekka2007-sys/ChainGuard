@@ -1,80 +1,97 @@
 # ChainGuard Security Properties
 
-**Status:** Research specification  
-**Version:** 0.1
+**Status:** Research specification and implementation tracker  
+**Version:** 0.2
 
-This document defines the properties the implementation and evaluation are intended to test. A property is not considered achieved merely because it appears here.
+A property is not considered achieved merely because it appears here. Status labels describe the current prototype, not production assurance.
 
 ## P1 — Scope attenuation
 
-For parent capability P and child capability C:
+For parent P and child C, C.actions and C.resources must be subsets of the corresponding parent scopes.
 
-- C.actions is a subset of P.actions.
-- C.resources is a subset of P.resources.
+**Prototype status:** Implemented in delegation and chain verification; gateway checks the requested action and resource against the leaf scope.
 
-A child must not acquire an action or resource that its parent does not possess.
-
-**Falsification test:** construct a child with one extra action or resource and attempt to pass it through the protected-operation gateway. The operation must not execute.
+**Falsification test:** attempt action or resource escalation and assert that the adapter is never called.
 
 ## P2 — Issuer authenticity
 
-A capability is accepted only if its signature verifies under the trusted public key registered for the capability's claimed issuer.
+Every capability signature must verify under the trusted public key registered for its claimed issuer.
 
-**Falsification test:** sign as one identity while claiming another issuer; alter a signed field; use an unregistered identity; substitute a public key.
+**Prototype status:** Implemented with Ed25519 and an in-memory identity registry.
+
+**Falsification test:** claim another issuer, use an unknown issuer, substitute a key, or tamper with signed fields.
 
 ## P3 — Delegation authorization
 
-For each adjacent parent P and child C in a chain:
+For every adjacent parent P and child C:
 - C.issuer equals P.subject;
 - C.parent_id equals P.capability_id;
 - C.ancestor_ids exactly records the preceding capability IDs;
-- C.root_principal equals the chain root;
-- C's action and resource scopes are subsets of P's.
+- C.root_principal equals the root principal;
+- child action/resource scopes are subsets of parent scopes.
 
-**Falsification test:** forge, reorder, omit, duplicate, or substitute chain elements and verify that protected execution is denied.
+**Prototype status:** Implemented in chain verification.
+
+**Falsification test:** reorder, omit, duplicate, or substitute chain elements.
 
 ## P4 — Revocation closure
 
-If capability P is revoked, P and every descendant of P are rejected. Revoking a child must not revoke its parent or unrelated siblings.
+Revoking a capability must invalidate it and every descendant. Revoking a child must not revoke its parent or siblings.
 
-**Falsification test:** revoke a root, intermediate node, leaf, and sibling in separate trials; verify the expected impact on every related chain.
+**Prototype status:** Implemented in an in-memory registry and checked by the gateway.
+
+**Limitation:** process-local state and non-atomic interaction with external execution.
 
 ## P5 — Replay resistance
 
-A request accepted once must not be accepted again when the operation semantics require single-use execution. Reuse must be rejected using a request identifier, nonce, expiry, or durable idempotency record.
+A request ID must not be accepted twice by the same gateway process.
 
-**Falsification test:** submit the same signed request repeatedly, concurrently, and after expiry. Measure duplicate protected executions.
+**Prototype status:** Implemented with a thread-safe, process-local replay guard.
+
+**Limitation:** no shared state across processes/hosts, durable retention, TTL policy, or exactly-once external execution.
+
+**Falsification test:** submit duplicate IDs sequentially and concurrently; assert only one adapter invocation.
 
 ## P6 — Execution-context binding
 
-Authority must be bound to the intended audience/tool and, where required, task or workflow. A capability for one service or task must not be usable against another.
+Authority must be bound to an intended audience and workflow. Child capabilities must inherit these claims and may not change them.
 
-**Falsification test:** reuse an otherwise valid capability with a different audience, tool, tenant, or workflow identifier.
+**Prototype status:** Implemented; audience, workflow ID, and expiry are signed capability fields.
+
+**Limitation:** no standardized tenant/service identity model or external audience registry yet.
+
+**Falsification test:** change audience/workflow, tamper with signed claims, or attempt a child context change.
 
 ## P7 — Enforcement completeness
 
 Every protected operation must pass through the gateway. Agents must not possess independent credentials that permit bypass.
 
-**Falsification test:** attempt direct invocation through every exposed tool/API path and inspect credential distribution and service-side authorization logs.
+**Prototype status:** Local adapter boundary exists.
+
+**Limitation:** repository code cannot establish infrastructure-level exclusivity. A deployment must prove service-side and credential-level bypass resistance.
 
 ## P8 — Fail-closed behavior
 
-Malformed proofs, unknown identities, unavailable mandatory trust/revocation state, invalid signatures, expired authority, and context mismatch must not result in protected execution.
+Malformed proofs, unknown identities, invalid signatures, expired or revoked capabilities, context mismatch, and duplicate request IDs must not cause adapter execution.
 
-**Falsification test:** inject each failure independently and during dependency outages; assert that the underlying operation was not called.
+**Prototype status:** Implemented for the local gateway checks.
+
+**Limitation:** outages of external distributed dependencies are not yet modeled because the prototype uses in-memory state.
 
 ## P9 — Benign utility
 
-Security controls should not reject valid operations or make normal workflows unusable beyond an explicitly measured overhead budget.
+Security controls should preserve valid task execution with measurable overhead.
 
-**Falsification test:** replay a fixed benign workload and report completion rate, false rejection rate, and latency with confidence intervals.
+**Prototype status:** Not yet benchmarked.
+
+**Falsification test:** run fixed benign workloads and report completion rate, false rejection, and latency distributions.
 
 ## Evidence levels
 
 - **Specified:** written as a property.
 - **Unit-tested:** tested in isolation.
-- **Integration-tested:** tested across the gateway and its dependencies.
+- **Integration-tested:** tested across the gateway and adapter.
 - **Adversarially evaluated:** tested against an explicit attack suite.
-- **Formally analysed:** supported by a proof or model-checking result under stated assumptions.
+- **Formally analysed:** supported by proof or model checking under stated assumptions.
 
-Do not describe a property as guaranteed unless the evidence and assumptions justify that wording.
+Do not describe a property as guaranteed unless evidence and assumptions justify that wording.
