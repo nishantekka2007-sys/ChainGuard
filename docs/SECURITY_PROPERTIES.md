@@ -40,7 +40,7 @@ Revoking a capability must invalidate it and every descendant. Revoking a child 
 
 **Prototype status:** Implemented in in-memory and SQLite-backed registries and checked by the gateway.
 
-**Limitation:** SQLite provides single-host persistence only. Revocation checks and external execution are not one atomic transaction.
+**Limitation:** the default gateway uses a point-in-time check. Optional SQLiteAdmissionCoordinator provides single-host admission ordering, not dispatch-time fencing; already-admitted work may complete after a later revoke.
 
 ## P5 — Replay resistance
 
@@ -115,3 +115,12 @@ When SQLite mode is configured, registered public keys, revocation records, and 
 **Prototype status:** Implemented for single-host SQLite storage; restart and concurrent replay integration tests are included.
 
 **Limitation:** not a distributed consistency guarantee. Database compromise or rollback can undermine the state assumptions.
+
+
+## P12 — Serialized admission ordering
+
+When the optional SQLiteAdmissionCoordinator is configured and all gateway/revocation writers use the same local database file, revocation-lineage checking and request-ID consumption occur in one BEGIN IMMEDIATE transaction. The transaction commit is the admission linearization point.
+
+**Prototype status:** Implemented and covered by deterministic tests for revocation-before-admission, revocation-after-admission, and replay uniqueness across coordinator instances.
+
+**Limitation:** admission ordering only. It does not prevent a request admitted before revocation from reaching or completing its side effect afterward; it is not a distributed or dispatch-time guarantee.
