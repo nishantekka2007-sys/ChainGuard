@@ -57,14 +57,14 @@ The Python gateway now provides a local enforcement boundary for a supplied adap
 | Immutable capability model | Implemented |
 | Action and resource scope attenuation | Implemented |
 | Ed25519 signing of authority and context fields | Implemented |
-| In-memory identity-to-key registry | Implemented |
+| In-memory and SQLite-backed identity registries | Implemented |
 | Authorization-aware delegation-chain verification | Implemented |
-| In-memory ancestor-aware revocation | Implemented |
+| In-memory and SQLite-backed ancestor-aware revocation | Implemented |
 | Gateway checks before adapter execution | Implemented |
 | Audience, workflow and expiry binding | Implemented |
-| Thread-safe, process-local replay guard | Implemented |
-| Durable/distributed identity and revocation | Planned |
-| Durable replay/idempotency and multi-instance consistency | Planned |
+| In-memory and SQLite-backed replay guards | Implemented |
+| Distributed multi-host identity and revocation | Planned |
+| Distributed replay/idempotency and multi-host consistency | Planned |
 | Production tool adapters and infrastructure bypass prevention | Planned |
 | Structured audit trail and adversarial benchmark | Planned |
 
@@ -93,7 +93,7 @@ pytest -v
 python examples/minimal_gateway.py
 ```
 
-See [Architecture](docs/ARCHITECTURE.md) for the design and [Threat Model](docs/THREAT_MODEL.md) for assumptions. A runnable educational example is available at [examples/minimal_gateway.py](examples/minimal_gateway.py).
+See [Architecture](docs/ARCHITECTURE.md) for the design and [Threat Model](docs/THREAT_MODEL.md) for assumptions, and [Persistence](docs/PERSISTENCE.md) for the SQLite option. A runnable educational example is available at [examples/minimal_gateway.py](examples/minimal_gateway.py).
 
 ## Research and design documents
 
@@ -108,7 +108,7 @@ See [Architecture](docs/ARCHITECTURE.md) for the design and [Threat Model](docs/
 
 ## Security and responsible use
 
-ChainGuard remains an **early-stage research prototype**, not a production security product. Identity, revocation, and replay state are in-memory and process-local. There is no durable distributed consistency model, production key management, or proof that every deployment path is forced through the gateway.
+ChainGuard remains an **early-stage research prototype**, not a production security product. In-memory state remains the default, with an optional SQLite-backed persistent mode for single-host deployments. SQLite does not provide distributed multi-host consistency, production key management, or proof that every deployment path is forced through the gateway.
 
 Do not use this version to protect real accounts, funds, credentials, sensitive data, or production systems. Do not commit private keys, API tokens, or secrets. Security claims must always name the tested threat model and assumptions.
 
