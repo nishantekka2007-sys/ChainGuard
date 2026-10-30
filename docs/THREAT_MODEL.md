@@ -21,7 +21,7 @@ A capability identifies:
 - permitted actions and resources;
 - its parent capability and recorded ancestors.
 
-The prototype currently implements capability modelling, Ed25519 integrity, an in-memory identity registry, chain verification, and in-memory ancestor-aware revocation. A runtime enforcement gateway is not yet implemented.
+The prototype implements capability modelling, Ed25519 integrity, issuer identity lookup, chain verification, ancestor-aware revocation, a local enforcement gateway, actor-signed requests, audience/workflow/expiry checks, and replay protection. Identity, revocation, and replay state can use either in-memory registries or SQLite-backed persistent registries for single-host deployments.
 
 ## 3. Security objectives
 
@@ -36,7 +36,7 @@ ChainGuard should enforce these properties at the protected-operation boundary:
 7. **Fail-closed authorization:** malformed, unverifiable, expired, revoked, or context-mismatched authority is rejected.
 8. **No enforcement bypass:** protected credentials and operations are accessible only through the enforcement boundary.
 
-These are design objectives. They are not all implemented or experimentally demonstrated yet.
+The local gateway implements these checks in the prototype. Infrastructure-level enforcement completeness and distributed consistency are not demonstrated. Each property still requires adversarial evaluation beyond unit and integration tests.
 
 ## 4. Attacker model
 
@@ -59,6 +59,7 @@ The baseline initially trusts:
 - the human root authorization process and the scope it grants;
 - the enforcement gateway and its policy implementation;
 - the identity/key trust anchor and its authenticated enrollment process;
+- the SQLite database file, its host, and the filesystem permissions protecting it, when persistent mode is used;
 - the underlying tool adapter to execute only requests authorized by the gateway.
 
 These assumptions must be stated in every evaluation. They are not claims that these components are intrinsically secure.
@@ -72,7 +73,7 @@ Compromise of the human root, enforcement gateway, identity trust anchor, host o
 1. **Human to root authority:** the system receives an explicit root scope.
 2. **Agent to agent:** delegation is represented by a signed child capability.
 3. **Agent to gateway:** an agent submits a request and proof of authority.
-4. **Gateway to identity/revocation services:** the gateway obtains trusted key and revocation state.
+4. **Gateway to identity/revocation services:** the gateway obtains trusted key and revocation state from in-memory stores or the configured SQLite database.
 5. **Gateway to protected tool:** only an authorized gateway call may reach the protected operation.
 
 The last boundary is essential. If an agent can call the underlying API directly with independent credentials, ChainGuard cannot prevent bypass.
@@ -110,3 +111,8 @@ For each security claim, maintain:
 - known assumptions and limitations.
 
 A passing unit-test suite is necessary but not sufficient evidence of production security.
+
+
+## 10. Persistence boundary
+
+SQLite mode is designed for durable state shared by processes on one host. It is not a distributed database or consensus protocol. Multi-host deployments, network-filesystem semantics, backup/restore behavior, and database tampering are outside the current implementation evidence. Private signing keys are not stored in the SQLite database.
