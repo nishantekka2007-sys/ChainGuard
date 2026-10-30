@@ -104,7 +104,9 @@ See [Architecture](docs/ARCHITECTURE.md) for the design and [Threat Model](docs/
 - [Security properties](docs/SECURITY_PROPERTIES.md) — properties and falsification tests.
 - [Research proposal](docs/RESEARCH_PROPOSAL.md) — question, hypothesis, contributions, and method.
 - [Experiment plan](docs/EXPERIMENT_PLAN.md) — baselines, attack suite, metrics, and controls.
-- [Benchmark guide](docs/BENCHMARK.md) — run the initial reproducible synthetic baseline comparison.\n- [Revocation TOCTOU experiment](docs/REVOCATION_TOCTOU.md) — reproduce the check/use gap around revocation and adapter execution.
+- [Benchmark guide](docs/BENCHMARK.md) — run the initial reproducible synthetic baseline comparison.
+- [Revocation consistency contract](docs/REVOCATION_CONSISTENCY.md) — define admission, dispatch, and completion semantics before mitigation.
+- [Revocation TOCTOU experiment](docs/REVOCATION_TOCTOU.md) — reproduce the check/use gap around revocation and adapter execution.
 - [Limitations](docs/LIMITATIONS.md) — current gaps, residual risks, and claim discipline.
 - [Security policy](SECURITY.md) — responsible vulnerability reporting.
 - [Contributing](CONTRIBUTING.md) — development and security-test expectations.

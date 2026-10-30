@@ -43,7 +43,7 @@ All baselines must use the same workload, attack inputs, hardware, and measureme
 | Malformed input | Submit invalid types, missing fields, or oversized values | Deny safely |
 | Gateway bypass | Call protected service without gateway | Service-side control must deny |
 
-A test counts as prevented only if the protected operation did not execute.
+A test counts as prevented only if the protected operation did not execute. Revocation race cases must record the event ordering defined in [REVOCATION_CONSISTENCY.md](REVOCATION_CONSISTENCY.md); a gateway denial alone does not prove that a side effect did not occur.
 
 ## 4. Benign workload
 
