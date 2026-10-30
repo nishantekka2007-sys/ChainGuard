@@ -75,7 +75,7 @@ def test_gateway_executes_valid_authorized_request(environment):
 
 
 def test_gateway_rejects_action_escalation_before_execution(environment):
-    gateway, _, _, _, _, chain = environment
+    gateway, _, _, _, _, chain, agent_b_key = environment
     adapter = RecordingAdapter()
 
     with pytest.raises(AuthorizationError, match="outside"):
@@ -85,7 +85,7 @@ def test_gateway_rejects_action_escalation_before_execution(environment):
 
 
 def test_gateway_rejects_resource_escalation_before_execution(environment):
-    gateway, _, _, _, _, chain = environment
+    gateway, _, _, _, _, chain, agent_b_key = environment
     adapter = RecordingAdapter()
 
     with pytest.raises(AuthorizationError, match="outside"):
@@ -103,7 +103,7 @@ def test_gateway_rejects_resource_escalation_before_execution(environment):
     ],
 )
 def test_gateway_rejects_context_mismatch(environment, field, value, message):
-    gateway, _, _, _, _, chain = environment
+    gateway, _, _, _, _, chain, agent_b_key = environment
     adapter = RecordingAdapter()
 
     with pytest.raises(AuthorizationError, match=message):
@@ -120,7 +120,7 @@ def test_gateway_rejects_expired_capability(environment):
     adapter = RecordingAdapter()
 
     with pytest.raises(AuthorizationError, match="expired"):
-        expired_gateway.execute(chain, valid_request(), adapter)
+        expired_gateway.execute(chain, signed_request(agent_b_key), adapter)
 
     assert adapter.calls == []
 
@@ -131,29 +131,30 @@ def test_gateway_rejects_revoked_ancestor(environment):
     adapter = RecordingAdapter()
 
     with pytest.raises(AuthorizationError, match="revoked"):
-        gateway.execute(chain, valid_request(), adapter)
+        gateway.execute(chain, signed_request(agent_b_key), adapter)
 
     assert adapter.calls == []
 
 
 def test_gateway_rejects_replayed_request_id(environment):
-    gateway, _, _, _, _, chain = environment
+    gateway, _, _, _, _, chain, agent_b_key = environment
     adapter = RecordingAdapter()
 
-    gateway.execute(chain, valid_request(), adapter)
+    signed = signed_request(agent_b_key)
+    gateway.execute(chain, signed, adapter)
     with pytest.raises(AuthorizationError, match="replay"):
-        gateway.execute(chain, valid_request(), adapter)
+        gateway.execute(chain, signed, adapter)
 
     assert len(adapter.calls) == 1
 
 
 def test_gateway_rejects_malformed_chain_before_execution(environment):
-    gateway, _, _, _, _, chain = environment
+    gateway, _, _, _, _, chain, agent_b_key = environment
     adapter = RecordingAdapter()
 
     with pytest.raises(AuthorizationError, match="chain verification"):
         gateway.execute(
-            (replace(chain[0], capability=object()),), valid_request(), adapter
+            (replace(chain[0], capability=object()),), signed_request(agent_b_key), adapter
         )
 
     assert adapter.calls == []
@@ -182,7 +183,8 @@ def test_gateway_rejects_capability_without_execution_context():
 
 
 def test_request_id_stays_consumed_if_adapter_raises(environment):
-    gateway, _, _, _, _, chain = environment
+    gateway, _, _, _, _, chain, agent_b_key = environment
+    signed = signed_request(agent_b_key, "uncertain-outcome")
 
     class FailingAdapter:
         def execute(self, request):
@@ -190,24 +192,25 @@ def test_request_id_stays_consumed_if_adapter_raises(environment):
 
     with pytest.raises(RuntimeError, match="service failure"):
         gateway.execute(
-            chain, valid_request("uncertain-outcome"), FailingAdapter()
+            chain, signed, FailingAdapter()
         )
 
     with pytest.raises(AuthorizationError, match="replay"):
         gateway.execute(
-            chain, valid_request("uncertain-outcome"), RecordingAdapter()
+            chain, signed, RecordingAdapter()
         )
 
 
 def test_concurrent_replay_allows_only_one_adapter_execution(environment):
     from concurrent.futures import ThreadPoolExecutor
 
-    gateway, _, _, _, _, chain = environment
+    gateway, _, _, _, _, chain, agent_b_key = environment
     adapter = RecordingAdapter()
+    signed = signed_request(agent_b_key, "concurrent-request")
 
     def attempt():
         try:
-            gateway.execute(chain, signed_request(agent_b_key, "concurrent-request"), adapter)
+            gateway.execute(chain, signed, adapter)
             return "allowed"
         except AuthorizationError:
             return "rejected"
