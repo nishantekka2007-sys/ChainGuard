@@ -1,7 +1,7 @@
 # Reproducible Baseline Benchmark
 
 **Status:** Initial synthetic microbenchmark  
-**Version:** 1.0
+**Version:** 1.1
 
 ## Purpose
 
@@ -17,7 +17,7 @@ From the repository root:
 python -m research.benchmark --trials 100 --output benchmark-results.json
 ```
 
-Use `--output -` to print JSON to standard output. The report records the benchmark identifier, trial count, baseline names, accepted/rejected counts, attack success rate, false rejection rate, benign completion rate, and median/p95/p99 decision latency.
+Use `--output -` to print JSON to standard output. The report records the benchmark identifier, measurement boundary, trial count, baseline names, accepted/rejected counts, attack success rate, false rejection rate, benign completion rate, and median/p95/p99 decision latency.
 
 ## Scenarios
 
@@ -53,7 +53,7 @@ If observed outcomes differ, treat that as a failed benchmark assertion and inve
 - **Benign completion rate:** accepted valid requests divided by valid requests.
 - **Latency:** time spent in the baseline decision path; median, p95 and p99 are reported in milliseconds.
 
-The benchmark uses a fixed synthetic case, freshly generated Ed25519 keys per benchmark run, and repeated local decisions. It does not include network latency, real tools, model inference, distributed state, production database contention, or a broad attack corpus. Results should not be generalized beyond this scenario.
+The benchmark uses a fixed synthetic case, freshly generated Ed25519 keys per benchmark run, and repeated local decisions. Gateway construction and action-request signing are excluded from the measured decision latency: one gateway and adapter are prepared and reused for each scenario, while each full-gateway attempt receives a fresh request ID to preserve single-use semantics. It does not include network latency, real tools, model inference, distributed state, production database contention, or a broad attack corpus. Results should not be generalized beyond this scenario.
 
 ## Reproducibility checklist for future studies
 
