@@ -35,7 +35,11 @@ Register each principal's public key through an authenticated enrollment process
 
 For serialized admission, supply the same database path to the identity, revocation, and replay stores and to SQLiteAdmissionCoordinator. Use a local filesystem path accessible to the gateway process. Keep the database and its backups protected by operating-system permissions and operational controls.
 
-## Serialized admission (optional)\n\nPass SQLiteAdmissionCoordinator(database) as the gateway's admission_coordinator argument. It uses BEGIN IMMEDIATE to serialize the revocation check and request-ID consumption against revocation writes on the same database. This defines admission ordering: an operation admitted before a later revoke may still execute or complete after the revoke. It does not provide dispatch-time fencing or cancellation. See [Revocation admission semantics](REVOCATION_ADMISSION.md).\n\n## What persists?
+## Serialized admission (optional)
+
+Pass SQLiteAdmissionCoordinator(database) as the gateway's admission_coordinator argument. It uses BEGIN IMMEDIATE to serialize the revocation check and request-ID consumption against revocation writes on the same database. This defines admission ordering: an operation admitted before a later revoke may still execute or complete after the revoke. It does not provide dispatch-time fencing or cancellation. See [Revocation admission semantics](REVOCATION_ADMISSION.md).
+
+## What persists?
 
 | State | SQLite table | Behavior |
 |---|---|---|
