@@ -36,7 +36,15 @@ class SQLiteStateStore:
             self.database = str(path)
 
         with self.connect() as connection:
-            connection.execute("PRAGMA journal_mode=WAL")
+            # Multiple processes may initialize registries against the same new
+            # database simultaneously. WAL mode is an optimization, not a
+            # correctness requirement; another initializer may hold the schema
+            # lock while this connection requests the journal-mode transition.
+            try:
+                connection.execute("PRAGMA journal_mode=WAL")
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower() and "busy" not in str(exc).lower():
+                    raise
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS schema_metadata (
