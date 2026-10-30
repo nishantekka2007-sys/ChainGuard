@@ -1,0 +1,194 @@
+from dataclasses import replace
+
+import pytest
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from chainguard.core import AuthorizationError, delegate, issue_root_capability
+from chainguard.gateway import ActionRequest, EnforcementGateway
+from chainguard.identity import IdentityRegistry
+from chainguard.integrity import sign_capability
+from chainguard.revocation import RevocationRegistry
+
+
+class RecordingAdapter:
+    def __init__(self):
+        self.calls = []
+
+    def execute(self, request):
+        self.calls.append(request)
+        return {"executed": request.action, "resource": request.resource}
+
+
+@pytest.fixture
+def environment():
+    human_key = Ed25519PrivateKey.generate()
+    agent_a_key = Ed25519PrivateKey.generate()
+    agent_b_key = Ed25519PrivateKey.generate()
+
+    identities = IdentityRegistry()
+    identities.register("human", human_key.public_key().public_bytes_raw())
+    identities.register("agent-a", agent_a_key.public_key().public_bytes_raw())
+    identities.register("agent-b", agent_b_key.public_key().public_bytes_raw())
+
+    root = issue_root_capability(
+        "human", "agent-a", {"read", "summarize"}, {"report-1"},
+        audience="report-service",
+        workflow_id="quarterly-review",
+        expires_at=2_000_000_000,
+    )
+    child = delegate(root, "agent-a", "agent-b", {"read"}, {"report-1"})
+    chain = (
+        sign_capability(root, human_key),
+        sign_capability(child, agent_a_key),
+    )
+    revocations = RevocationRegistry()
+    gateway = EnforcementGateway(
+        identities, revocations, clock=lambda: 1_900_000_000
+    )
+    return gateway, identities, revocations, root, child, chain
+
+
+def valid_request(request_id="request-001"):
+    return ActionRequest(
+        request_id=request_id,
+        actor="agent-b",
+        action="read",
+        resource="report-1",
+        audience="report-service",
+        workflow_id="quarterly-review",
+    )
+
+
+def test_gateway_executes_valid_authorized_request(environment):
+    gateway, _, _, _, _, chain = environment
+    adapter = RecordingAdapter()
+
+    result = gateway.execute(chain, valid_request(), adapter)
+
+    assert result == {"executed": "read", "resource": "report-1"}
+    assert len(adapter.calls) == 1
+
+
+def test_gateway_rejects_action_escalation_before_execution(environment):
+    gateway, _, _, _, _, chain = environment
+    adapter = RecordingAdapter()
+
+    with pytest.raises(AuthorizationError, match="outside"):
+        gateway.execute(chain, replace(valid_request(), action="delete"), adapter)
+
+    assert adapter.calls == []
+
+
+def test_gateway_rejects_resource_escalation_before_execution(environment):
+    gateway, _, _, _, _, chain = environment
+    adapter = RecordingAdapter()
+
+    with pytest.raises(AuthorizationError, match="outside"):
+        gateway.execute(chain, replace(valid_request(), resource="payroll"), adapter)
+
+    assert adapter.calls == []
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("actor", "agent-a", "actor"),
+        ("audience", "payment-service", "audience"),
+        ("workflow_id", "different-workflow", "workflow"),
+    ],
+)
+def test_gateway_rejects_context_mismatch(environment, field, value, message):
+    gateway, _, _, _, _, chain = environment
+    adapter = RecordingAdapter()
+
+    with pytest.raises(AuthorizationError, match=message):
+        gateway.execute(chain, replace(valid_request(), **{field: value}), adapter)
+
+    assert adapter.calls == []
+
+
+def test_gateway_rejects_expired_capability(environment):
+    _, identities, revocations, _, _, chain = environment
+    expired_gateway = EnforcementGateway(
+        identities, revocations, clock=lambda: 2_000_000_000
+    )
+    adapter = RecordingAdapter()
+
+    with pytest.raises(AuthorizationError, match="expired"):
+        expired_gateway.execute(chain, valid_request(), adapter)
+
+    assert adapter.calls == []
+
+
+def test_gateway_rejects_revoked_ancestor(environment):
+    gateway, _, revocations, root, _, chain = environment
+    revocations.revoke(root)
+    adapter = RecordingAdapter()
+
+    with pytest.raises(AuthorizationError, match="revoked"):
+        gateway.execute(chain, valid_request(), adapter)
+
+    assert adapter.calls == []
+
+
+def test_gateway_rejects_replayed_request_id(environment):
+    gateway, _, _, _, _, chain = environment
+    adapter = RecordingAdapter()
+
+    gateway.execute(chain, valid_request(), adapter)
+    with pytest.raises(AuthorizationError, match="replay"):
+        gateway.execute(chain, valid_request(), adapter)
+
+    assert len(adapter.calls) == 1
+
+
+def test_gateway_rejects_malformed_chain_before_execution(environment):
+    gateway, _, _, _, _, chain = environment
+    adapter = RecordingAdapter()
+
+    with pytest.raises(AuthorizationError, match="chain verification"):
+        gateway.execute(
+            (replace(chain[0], capability=object()),), valid_request(), adapter
+        )
+
+    assert adapter.calls == []
+
+
+def test_gateway_rejects_capability_without_execution_context():
+    human_key = Ed25519PrivateKey.generate()
+    agent_key = Ed25519PrivateKey.generate()
+    identities = IdentityRegistry()
+    identities.register("human", human_key.public_key().public_bytes_raw())
+    identities.register("agent", agent_key.public_key().public_bytes_raw())
+    root = issue_root_capability("human", "agent", {"read"}, {"report"})
+    chain = (sign_capability(root, human_key),)
+    gateway = EnforcementGateway(
+        identities, RevocationRegistry(), clock=lambda: 100
+    )
+    adapter = RecordingAdapter()
+    request = ActionRequest(
+        "req-no-context", "agent", "read", "report", "report-service", "workflow"
+    )
+
+    with pytest.raises(AuthorizationError, match="audience"):
+        gateway.execute(chain, request, adapter)
+
+    assert adapter.calls == []
+
+
+def test_request_id_stays_consumed_if_adapter_raises(environment):
+    gateway, _, _, _, _, chain = environment
+
+    class FailingAdapter:
+        def execute(self, request):
+            raise RuntimeError("service failure")
+
+    with pytest.raises(RuntimeError, match="service failure"):
+        gateway.execute(
+            chain, valid_request("uncertain-outcome"), FailingAdapter()
+        )
+
+    with pytest.raises(AuthorizationError, match="replay"):
+        gateway.execute(
+            chain, valid_request("uncertain-outcome"), RecordingAdapter()
+        )
