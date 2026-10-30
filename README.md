@@ -98,6 +98,7 @@ See [Architecture](docs/ARCHITECTURE.md) for the design and [Threat Model](docs/
 ## Research and design documents
 
 - [Architecture](docs/ARCHITECTURE.md) — components, request flow, and trust boundaries.
+- [Persistence](docs/PERSISTENCE.md) — configuring SQLite-backed identity, revocation, and replay state.
 - [Threat model](docs/THREAT_MODEL.md) — attacker capabilities, assumptions, and out-of-scope cases.
 - [Security properties](docs/SECURITY_PROPERTIES.md) — properties and falsification tests.
 - [Research proposal](docs/RESEARCH_PROPOSAL.md) — question, hypothesis, contributions, and method.
