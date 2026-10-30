@@ -17,7 +17,7 @@ For parent P and child C, C.actions and C.resources must be subsets of the corre
 
 Every capability signature must verify under the trusted public key registered for its claimed issuer.
 
-**Prototype status:** Implemented with Ed25519 and an in-memory identity registry.
+**Prototype status:** Implemented with Ed25519 and either an in-memory or SQLite-backed identity registry.
 
 **Falsification test:** claim another issuer, use an unknown issuer, substitute a key, or tamper with signed fields.
 
@@ -38,17 +38,17 @@ For every adjacent parent P and child C:
 
 Revoking a capability must invalidate it and every descendant. Revoking a child must not revoke its parent or siblings.
 
-**Prototype status:** Implemented in an in-memory registry and checked by the gateway.
+**Prototype status:** Implemented in in-memory and SQLite-backed registries and checked by the gateway.
 
-**Limitation:** process-local state and non-atomic interaction with external execution.
+**Limitation:** SQLite provides single-host persistence only. Revocation checks and external execution are not one atomic transaction.
 
 ## P5 — Replay resistance
 
-A request ID must not be accepted twice by the same gateway process.
+A request ID must not be accepted twice by gateway instances sharing the configured replay store.
 
-**Prototype status:** Implemented with a thread-safe, process-local replay guard.
+**Prototype status:** Implemented with an in-memory guard or SQLite-backed durable single-host replay guard.
 
-**Limitation:** no shared state across processes/hosts, durable retention, TTL policy, or exactly-once external execution.
+**Limitation:** no distributed multi-host consistency, TTL/retention policy, or exactly-once external execution.
 
 **Falsification test:** submit duplicate IDs sequentially and concurrently; assert only one adapter invocation.
 
@@ -76,7 +76,7 @@ Malformed proofs, unknown identities, invalid signatures, expired or revoked cap
 
 **Prototype status:** Implemented for the local gateway checks.
 
-**Limitation:** outages of external distributed dependencies are not yet modeled because the prototype uses in-memory state.
+**Limitation:** persistent SQLite failures must fail closed; distributed dependency outages and cross-host consistency are not yet evaluated.
 
 ## P9 — Benign utility
 
@@ -106,3 +106,12 @@ A protected action request must be signed by the private key registered to the c
 **Falsification test:** change any signed request field after signing, claim another actor, or sign with an unregistered key. The adapter must not be invoked.
 
 **Limitation:** this proves possession of the registered signing key for the request. It does not protect a compromised agent that legitimately controls that key, nor does it replace transport security or secure key storage.
+
+
+## P11 — Persistent state continuity
+
+When SQLite mode is configured, registered public keys, revocation records, and consumed request IDs must remain effective after registry/gateway objects are recreated and must be shared by local processes using the same database file.
+
+**Prototype status:** Implemented for single-host SQLite storage; restart and concurrent replay integration tests are included.
+
+**Limitation:** not a distributed consistency guarantee. Database compromise or rollback can undermine the state assumptions.
