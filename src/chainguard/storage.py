@@ -26,6 +26,8 @@ class SQLiteStateStore:
 
         self.database = str(database)
         self.timeout = float(timeout)
+        if self.database == ":memory:":
+            raise AuthorizationError("A database file path is required for shared persistent state.")
         if self.database != ":memory:":
             path = Path(self.database).expanduser()
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -145,7 +147,6 @@ class SQLiteReplayGuard:
     """Durable replay guard shared by gateway instances using the same DB."""
 
     def __init__(self, database: str | Path, *, timeout: float = 10.0) -> None:
-        super().__init__()
         self.store = SQLiteStateStore(database, timeout=timeout)
 
     def consume(self, request_id: str) -> None:
