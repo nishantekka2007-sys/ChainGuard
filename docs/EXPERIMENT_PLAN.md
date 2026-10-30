@@ -36,7 +36,7 @@ All baselines must use the same workload, attack inputs, hardware, and measureme
 | Signature tampering | Modify a signed field | Deny |
 | Parent substitution | Replace parent or parent ID | Deny |
 | Chain reordering | Reorder or omit chain elements | Deny |
-| Descendant after revocation | Use a child after ancestor revocation | Deny |
+| Descendant after revocation | Use a child after ancestor revocation | Deny when revocation is visible at the gateway check |\n| Revocation TOCTOU | Revoke after the gateway's active check but before adapter invocation | Define and enforce an explicit in-flight operation consistency contract; current prototype may execute |
 | Replay | Resubmit a previously accepted request | Reject duplicate when single-use semantics apply |
 | Audience confusion | Use a capability against another tool/service | Deny |
 | Workflow confusion | Reuse authority in another task/workflow | Deny when task binding is required |
@@ -60,7 +60,7 @@ For N attack attempts:
 - Benign completion rate = successfully completed benign workflows / all benign workflows.
 - Replay duplicate rate = duplicate protected executions / replay attempts.
 
-Latency must include the gateway's complete authorization path. Report median, p95, and p99, plus environment details. Measure revocation propagation from the committed revoke event to the first point at which every relevant enforcement instance rejects the capability.
+Latency must include the gateway's complete authorization path. Report median, p95, and p99, plus environment details. Measure revocation propagation from the committed revoke event to the first point at which every relevant enforcement instance rejects the capability. Separately test in-flight requests revoked after their active check; record whether the protected side effect begins or completes.
 
 ## 6. Experimental controls
 
