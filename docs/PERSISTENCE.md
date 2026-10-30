@@ -31,7 +31,7 @@ gateway = EnforcementGateway(
 )
 ```
 
-Register each principal's public key through an authenticated enrollment process before accepting its capabilities. The SQLite registry refuses to silently replace an identity's existing key.
+Register each principal's public key through an authenticated enrollment process before accepting its capabilities. The SQLite registry refuses to silently replace an identity's existing key. Use `rotate_key(identity, replacement_public_key)` for an explicit atomic rotation, or `deactivate(identity)` to disable an identity. Rotation invalidates signatures made with the previous key.
 
 The same database path must be supplied to all three stores. Use a local filesystem path accessible to the gateway process. Keep the database and its backups protected by operating-system permissions and operational controls.
 
@@ -39,7 +39,8 @@ The same database path must be supplied to all three stores. Use a local filesys
 
 | State | SQLite table | Behavior |
 |---|---|---|
-| Trusted public keys | `trusted_identities` | Identity registration survives restart; duplicate IDs are rejected |
+| Trusted public keys | `trusted_identities` | Identity registration survives restart; duplicate IDs are rejected; active state is checked on lookup |
+| Key rotation history | `identity_key_history` | Records old and replacement public keys for audit; private keys are never stored |
 | Revoked capability IDs | `revoked_capabilities` | Revocation survives restart and invalidates descendants |
 | Consumed request IDs | `consumed_requests` | Duplicate IDs are rejected across gateway instances sharing the database |
 
@@ -56,7 +57,7 @@ The replay guard consumes an ID before adapter invocation. If an external operat
 - Revocation lookup and a remote side effect are not one atomic transaction.
 - Database rollback or tampering can undermine revocation and replay guarantees.
 - Private signing keys are not stored by ChainGuard; use an appropriate key-management system.
-- Identity enrollment and key rotation are not implemented by this module.
+- Authenticated identity enrollment and production KMS/HSM integration are not implemented. Rotation is an administrative registry operation, not a complete key-management workflow.
 - No claim of production readiness follows from the persistence tests.
 
 ## Tests

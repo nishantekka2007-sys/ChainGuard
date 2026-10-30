@@ -58,6 +58,7 @@ The Python gateway now provides a local enforcement boundary for a supplied adap
 | Action and resource scope attenuation | Implemented |
 | Ed25519 signing of authority and context fields | Implemented |
 | In-memory and SQLite-backed identity registries | Implemented |
+| SQLite identity key rotation and deactivation | Implemented |
 | Authorization-aware delegation-chain verification | Implemented |
 | In-memory and SQLite-backed ancestor-aware revocation | Implemented |
 | Gateway checks before adapter execution | Implemented |
@@ -99,6 +100,7 @@ See [Architecture](docs/ARCHITECTURE.md) for the design and [Threat Model](docs/
 
 - [Architecture](docs/ARCHITECTURE.md) — components, request flow, and trust boundaries.
 - [Persistence](docs/PERSISTENCE.md) — configuring SQLite-backed identity, revocation, and replay state.
+- [Key lifecycle](docs/KEY_MANAGEMENT.md) — key rotation, deactivation, and trust assumptions.
 - [Threat model](docs/THREAT_MODEL.md) — attacker capabilities, assumptions, and out-of-scope cases.
 - [Security properties](docs/SECURITY_PROPERTIES.md) — properties and falsification tests.
 - [Research proposal](docs/RESEARCH_PROPOSAL.md) — question, hypothesis, contributions, and method.
