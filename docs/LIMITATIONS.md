@@ -10,7 +10,7 @@ This document is intentionally explicit. A security prototype is more credible w
 - Revocation checks and external tool execution are not one atomic transaction.
 - The gateway is a local Python boundary; infrastructure-level exclusivity and bypass prevention are not established.
 - The adapter contract receives a minimal action/resource request; real adapters must enforce exact operation semantics and safe parameter handling.
-- No production key-management service, key rotation, or key deactivation exists.
+- SQLite identity key rotation and deactivation are implemented, but no production key-management service, KMS/HSM integration, authenticated enrollment, or automated recovery exists.
 - No durable audit trail or complete adversarial benchmark exists.
 - The implementation has not been formally verified.
 
