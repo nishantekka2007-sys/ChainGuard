@@ -1,21 +1,16 @@
-"""Initial scope-attenuation model for ChainGuard.
-
-This module models delegation policy. It is not yet a cryptographic security
-boundary: capabilities are ordinary Python objects until later milestones add
-authentication, integrity protection, and runtime enforcement.
-"""
+"""Capability model and scope-attenuating delegation for ChainGuard."""
 
 from dataclasses import dataclass
 from uuid import uuid4
 
 
 class AuthorizationError(Exception):
-    """Raised when a requested delegation exceeds granted authority."""
+    """Raised when a requested operation or delegation is not authorized."""
 
 
 @dataclass(frozen=True)
 class Capability:
-    """An immutable-in-process record of a delegated permission scope."""
+    """An immutable capability bound to an issuer, subject, and execution context."""
 
     capability_id: str
     root_principal: str
@@ -25,18 +20,19 @@ class Capability:
     resources: frozenset[str]
     parent_id: str | None = None
     ancestor_ids: tuple[str, ...] = ()
+    audience: str | None = None
+    workflow_id: str | None = None
+    expires_at: int | None = None
 
 
 def _validated_scope(values: set[str], field_name: str) -> frozenset[str]:
     """Return a non-empty, normalized immutable scope."""
     if not isinstance(values, set) or not values:
         raise AuthorizationError(f"{field_name} must be a non-empty set.")
-
     if any(not isinstance(value, str) or not value.strip() for value in values):
         raise AuthorizationError(
             f"Every {field_name} entry must be a non-empty string."
         )
-
     return frozenset(value.strip() for value in values)
 
 
@@ -46,11 +42,29 @@ def _validated_identity(value: str, field_name: str) -> str:
     return value.strip()
 
 
+def _optional_context(value: str | None, field_name: str) -> str | None:
+    if value is None:
+        return None
+    return _validated_identity(value, field_name)
+
+
+def _validated_expiry(value: int | None) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise AuthorizationError("expires_at must be a positive Unix timestamp.")
+    return value
+
+
 def issue_root_capability(
     human: str,
     first_agent: str,
     actions: set[str],
     resources: set[str],
+    *,
+    audience: str | None = None,
+    workflow_id: str | None = None,
+    expires_at: int | None = None,
 ) -> Capability:
     """Create the first capability from a human-authorized scope."""
     return Capability(
@@ -60,6 +74,9 @@ def issue_root_capability(
         subject=_validated_identity(first_agent, "first_agent"),
         actions=_validated_scope(actions, "actions"),
         resources=_validated_scope(resources, "resources"),
+        audience=_optional_context(audience, "audience"),
+        workflow_id=_optional_context(workflow_id, "workflow_id"),
+        expires_at=_validated_expiry(expires_at),
     )
 
 
@@ -70,7 +87,7 @@ def delegate(
     actions: set[str],
     resources: set[str],
 ) -> Capability:
-    """Delegate only a subset of the parent's actions and resources."""
+    """Delegate a subset without changing the parent's execution context."""
     if not isinstance(parent, Capability):
         raise AuthorizationError("A valid parent capability is required.")
 
@@ -83,10 +100,8 @@ def delegate(
         raise AuthorizationError(
             "Only the capability's authorized subject can delegate it."
         )
-
     if not requested_actions.issubset(parent.actions):
         raise AuthorizationError("Privilege escalation: unauthorized action.")
-
     if not requested_resources.issubset(parent.resources):
         raise AuthorizationError("Privilege escalation: unauthorized resource.")
 
@@ -99,4 +114,7 @@ def delegate(
         resources=requested_resources,
         parent_id=parent.capability_id,
         ancestor_ids=parent.ancestor_ids + (parent.capability_id,),
+        audience=parent.audience,
+        workflow_id=parent.workflow_id,
+        expires_at=parent.expires_at,
     )
