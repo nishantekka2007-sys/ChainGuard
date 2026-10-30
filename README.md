@@ -17,7 +17,9 @@ For a parent capability \(P\) and child capability \(C\):
 
 **Ancestor-aware revocation:** revoking a capability invalidates that capability and every descendant in its recorded delegation chain.
 
-**Capability integrity:** Ed25519 signatures detect changes to the signed capability fields. Verification also requires the caller to provide the expected trusted public key.
+**Capability integrity:** Ed25519 signatures detect changes to signed capability fields.
+
+**Identity-bound authorization:** the claimed issuer must have a registered public key matching the signature, and each child capability must be authorized by the preceding parent in the chain.
 
 ## Project status
 
@@ -27,16 +29,22 @@ Early research prototype. The repository is being developed in small, tested set
 2. Authorization model and scope-attenuation tests
 3. In-memory, ancestor-aware capability revocation
 4. Ed25519 capability signing and tamper detection
-5. Runtime action enforcement
-6. Persistent revocation, replay resistance, execution-context binding, and threat simulations
+5. Trusted identity registry and authorization-aware chain verification
+6. Runtime action enforcement
+7. Persistent revocation, replay resistance, execution-context binding, and threat simulations
 
-## Cryptographic design and limitations
+## Cryptographic and trust model
 
-The current integrity layer signs a deterministic JSON representation of all authority-bearing capability fields, including the parent and ancestor identifiers. Ed25519 signing and verification use the Python `cryptography` package and the API documented by [PyCA cryptography](https://cryptography.io/en/latest/hazmat/primitives/asymmetric/ed25519/).
+The integrity layer signs a deterministic representation of all authority-bearing capability fields. The identity registry maps principal identifiers to trusted Ed25519 public keys. Chain verification checks each signature against the key registered for the claimed issuer, then checks parent linkage, delegation ancestry, root-principal continuity, and action/resource scope attenuation.
 
-A valid signature proves that the corresponding private key signed the payload. It does **not** prove that the key belongs to the claimed issuer. The caller must obtain the expected public key from a trusted identity/key registry. Key distribution, storage, rotation, delegation-chain signature verification, and production key protection are not yet implemented.
+This separates two properties:
 
-The revocation registry is in-memory and process-local. Capability objects and signatures are not yet integrated into a runtime action-enforcement boundary. This is a research prototype, not a production security control.
+- **Authenticity:** the registered key for the claimed issuer signed the capability.
+- **Authorization:** the issuer is the preceding capability's subject, and the child scope is a subset of the parent's scope.
+
+A valid signature alone does not establish authorization. The registry in this prototype is in-memory and assumes its enrollment data is already trusted. Authenticated enrollment, durable key storage, key rotation, distributed trust, and production key protection are not implemented.
+
+The revocation registry is also in-memory and process-local. Runtime action enforcement has not yet been integrated. This is a research prototype, not a production security control.
 
 Do not use this prototype to protect real accounts, funds, credentials, or production systems. Never commit private keys, access tokens, or local environment files.
 
