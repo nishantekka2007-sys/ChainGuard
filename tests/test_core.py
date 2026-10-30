@@ -29,6 +29,7 @@ def test_root_capability_preserves_human_authority():
     assert capability.issuer == "human-001"
     assert capability.subject == "finance-agent"
     assert capability.parent_id is None
+    assert capability.ancestor_ids == ()
 
 
 def test_legitimate_delegation_reduces_scope(root_capability):
@@ -46,79 +47,49 @@ def test_legitimate_delegation_reduces_scope(root_capability):
     assert child.actions == frozenset({"read"})
     assert child.resources == frozenset({"invoice-001"})
     assert child.parent_id == root_capability.capability_id
+    assert child.ancestor_ids == (root_capability.capability_id,)
 
 
 def test_rejects_unauthorized_action(root_capability):
     with pytest.raises(AuthorizationError, match="unauthorized action"):
-        delegate(
-            parent=root_capability,
-            delegator="finance-agent",
-            new_subject="payment-agent",
-            actions={"transfer_money"},
-            resources={"invoice-001"},
-        )
+        delegate(root_capability, "finance-agent", "payment-agent",
+                 {"transfer_money"}, {"invoice-001"})
 
 
 def test_rejects_unauthorized_resource(root_capability):
     with pytest.raises(AuthorizationError, match="unauthorized resource"):
-        delegate(
-            parent=root_capability,
-            delegator="finance-agent",
-            new_subject="external-agent",
-            actions={"read"},
-            resources={"bank-account-001"},
-        )
+        delegate(root_capability, "finance-agent", "external-agent",
+                 {"read"}, {"bank-account-001"})
 
 
 def test_rejects_wrong_delegator(root_capability):
     with pytest.raises(AuthorizationError, match="authorized subject"):
-        delegate(
-            parent=root_capability,
-            delegator="unknown-agent",
-            new_subject="another-agent",
-            actions={"read"},
-            resources={"invoice-001"},
-        )
+        delegate(root_capability, "unknown-agent", "another-agent",
+                 {"read"}, {"invoice-001"})
 
 
 def test_scope_restrictions_survive_multiple_hops(root_capability):
-    agent_b = delegate(
-        root_capability,
-        "finance-agent",
-        "agent-b",
-        {"read", "calculate"},
-        {"invoice-001"},
-    )
-    agent_c = delegate(
-        agent_b,
-        "agent-b",
-        "agent-c",
-        {"read"},
-        {"invoice-001"},
-    )
+    agent_b = delegate(root_capability, "finance-agent", "agent-b",
+                       {"read", "calculate"}, {"invoice-001"})
+    agent_c = delegate(agent_b, "agent-b", "agent-c",
+                       {"read"}, {"invoice-001"})
 
     assert agent_c.actions <= agent_b.actions <= root_capability.actions
     assert agent_c.resources <= agent_b.resources <= root_capability.resources
     assert agent_c.root_principal == root_capability.root_principal
+    assert agent_c.ancestor_ids == (
+        root_capability.capability_id,
+        agent_b.capability_id,
+    )
 
 
 def test_rejects_escalation_at_later_hop(root_capability):
-    agent_b = delegate(
-        root_capability,
-        "finance-agent",
-        "agent-b",
-        {"read"},
-        {"invoice-001"},
-    )
+    agent_b = delegate(root_capability, "finance-agent", "agent-b",
+                       {"read"}, {"invoice-001"})
 
     with pytest.raises(AuthorizationError, match="unauthorized action"):
-        delegate(
-            agent_b,
-            "agent-b",
-            "agent-c",
-            {"calculate"},
-            {"invoice-001"},
-        )
+        delegate(agent_b, "agent-b", "agent-c",
+                 {"calculate"}, {"invoice-001"})
 
 
 @pytest.mark.parametrize(
@@ -132,13 +103,8 @@ def test_rejects_escalation_at_later_hop(root_capability):
 )
 def test_rejects_empty_or_invalid_scope(root_capability, actions, resources):
     with pytest.raises(AuthorizationError):
-        delegate(
-            root_capability,
-            "finance-agent",
-            "agent-b",
-            actions,
-            resources,
-        )
+        delegate(root_capability, "finance-agent", "agent-b",
+                 actions, resources)
 
 
 def test_capability_is_immutable(root_capability):
