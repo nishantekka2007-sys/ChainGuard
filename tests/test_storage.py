@@ -84,3 +84,11 @@ def test_replay_guard_allows_only_one_concurrent_consumer_across_instances(tmp_p
 
     assert outcomes.count("accepted") == 1
     assert outcomes.count("rejected") == 7
+
+
+
+def test_store_rejects_memory_database_for_multi_connection_state():
+    from chainguard.storage import SQLiteStateStore
+
+    with pytest.raises(AuthorizationError, match="database file path"):
+        SQLiteStateStore(":memory:")
