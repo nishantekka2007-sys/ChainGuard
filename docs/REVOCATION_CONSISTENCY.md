@@ -43,14 +43,14 @@ This is stronger than dispatch ordering. It requires tracking and draining or ca
 
 ## 4. Current prototype guarantee
 
-The current implementation provides a point-in-time gateway check only:
+The default gateway path provides a point-in-time check only. When SQLiteAdmissionCoordinator is configured with the same database used by revocation writers, admission and revocation are serialized under Contract A:
 
-- If revocation is visible when the gateway checks, the request is rejected.
-- If revocation commits after that check, the in-flight request may still reach the adapter.
+- If revocation commits before the admission transaction, the request is rejected.
+- If admission commits first, the request may still reach the adapter or complete after a later revoke.
 - SQLite persistence does not close this gap; a transaction in the revocation store cannot make an unrelated adapter side effect atomic.
 - No distributed freshness, fencing, cancellation, or completion barrier is currently established.
 
-Therefore the prototype currently satisfies neither a demonstrated dispatch-ordering guarantee nor a completion barrier under concurrent revocation.
+The prototype has a tested single-host admission-ordering mode, but does not satisfy a dispatch-ordering guarantee or completion barrier under concurrent revocation.
 
 ## 5. Selected prototype contract: admission ordering
 
