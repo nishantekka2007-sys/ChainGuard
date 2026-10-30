@@ -55,7 +55,7 @@ class CaseResult:
     observed_status: str
 
 
-def _environment(replay_guard: ReplayGuard | None = None):
+def _environment(*, inject_late_revocation: bool = False):
     human_key = Ed25519PrivateKey.generate()
     agent_key = Ed25519PrivateKey.generate()
     identities = IdentityRegistry()
@@ -69,6 +69,10 @@ def _environment(replay_guard: ReplayGuard | None = None):
     )
     chain = (sign_capability(capability, human_key),)
     revocations = RevocationRegistry()
+    replay_guard = (
+        RevokeDuringReplayConsume(revocations, capability)
+        if inject_late_revocation else ReplayGuard()
+    )
     gateway = EnforcementGateway(
         identities, revocations, replay_guard=replay_guard,
         clock=lambda: 1_900_000_000,
@@ -102,13 +106,9 @@ def run_experiment() -> dict[str, object]:
     )
 
     # Controlled interleaving: revoke only after require_active() has returned.
-    capability, chain, revocations, _, signed = _environment()
-    late_guard = RevokeDuringReplayConsume(revocations, capability)
-    identities = IdentityRegistry()
-    # Reconstruct the trusted identity registry from the signed chain's issuer
-    # key is not possible from a signature alone; build a fresh environment
-    # with the injected guard so the gateway retains the proper registry.
-    capability, chain, revocations, gateway, signed = _environment(late_guard)
+    capability, chain, revocations, gateway, signed = _environment(
+        inject_late_revocation=True
+    )
     adapter = RecordingAdapter()
     rejected = False
     try:
