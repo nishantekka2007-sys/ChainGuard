@@ -95,7 +95,7 @@ pytest -v
 python examples/minimal_gateway.py
 ```
 
-See [Revocation admission semantics](docs/REVOCATION_ADMISSION.md) for the optional single-host SQLite admission coordinator. The default gateway path retains point-in-time revocation checks.\n\nSee [Architecture](docs/ARCHITECTURE.md) for the design and [Threat Model](docs/THREAT_MODEL.md) for assumptions, and [Persistence](docs/PERSISTENCE.md) for the SQLite option. A runnable educational example is available at [examples/minimal_gateway.py](examples/minimal_gateway.py).
+See [Revocation admission semantics](docs/REVOCATION_ADMISSION.md) for the optional single-host SQLite admission coordinator. The default gateway path retains point-in-time revocation checks.\n\nSee [Architecture](docs/ARCHITECTURE.md) for the design and [Threat Model](docs/THREAT_MODEL.md) for assumptions, and [Persistence](docs/PERSISTENCE.md) for the SQLite option. Runnable educational examples are available at [examples/minimal_gateway.py](examples/minimal_gateway.py) and [examples/sqlite_admission.py](examples/sqlite_admission.py).
 
 ## Research and design documents
 
