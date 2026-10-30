@@ -10,7 +10,6 @@ from pathlib import Path
 import sqlite3
 
 from chainguard.core import AuthorizationError, Capability
-from chainguard.gateway import ReplayGuard
 from chainguard.identity import IdentityRegistry
 from chainguard.revocation import RevocationRegistry
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -142,7 +141,7 @@ class SQLiteRevocationRegistry(RevocationRegistry):
         return row is not None
 
 
-class SQLiteReplayGuard(ReplayGuard):
+class SQLiteReplayGuard:
     """Durable replay guard shared by gateway instances using the same DB."""
 
     def __init__(self, database: str | Path, *, timeout: float = 10.0) -> None:
