@@ -6,9 +6,16 @@ tool execution; see the project limitations.
 """
 
 from dataclasses import dataclass
+import json
 from threading import Lock
 import time
 from typing import Callable, Protocol
+
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey,
+    Ed25519PublicKey,
+)
 
 from chainguard.core import AuthorizationError
 from chainguard.identity import IdentityRegistry
@@ -27,6 +34,83 @@ class ActionRequest:
     resource: str
     audience: str
     workflow_id: str
+
+
+@dataclass(frozen=True)
+class SignedActionRequest:
+    """An action request signed by the private key of its claimed actor."""
+
+    request: ActionRequest
+    signer_public_key: bytes
+    signature: bytes
+
+
+def _validate_action_request(request: ActionRequest) -> None:
+    if not isinstance(request, ActionRequest):
+        raise AuthorizationError("A valid action request is required.")
+    fields = (
+        request.request_id, request.actor, request.action,
+        request.resource, request.audience, request.workflow_id,
+    )
+    if any(not isinstance(value, str) or not value.strip() for value in fields):
+        raise AuthorizationError("Every request field must be a non-empty string.")
+
+
+def _canonical_request(request: ActionRequest) -> bytes:
+    """Serialize every request field deterministically before signing."""
+    _validate_action_request(request)
+    payload = {
+        "request_id": request.request_id,
+        "actor": request.actor,
+        "action": request.action,
+        "resource": request.resource,
+        "audience": request.audience,
+        "workflow_id": request.workflow_id,
+    }
+    return json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+
+
+def sign_action_request(
+    request: ActionRequest,
+    private_key: Ed25519PrivateKey,
+) -> SignedActionRequest:
+    """Sign a request to prove possession of the actor's registered key."""
+    if not isinstance(private_key, Ed25519PrivateKey):
+        raise AuthorizationError("A valid Ed25519 private key is required.")
+    payload = _canonical_request(request)
+    public_key = private_key.public_key().public_bytes_raw()
+    return SignedActionRequest(
+        request=request,
+        signer_public_key=public_key,
+        signature=private_key.sign(payload),
+    )
+
+
+def verify_action_request(
+    signed: SignedActionRequest,
+    registry: IdentityRegistry,
+) -> bool:
+    """Verify request integrity and proof of possession for its claimed actor."""
+    if not isinstance(signed, SignedActionRequest):
+        return False
+    if not isinstance(registry, IdentityRegistry):
+        return False
+    if not isinstance(signed.signer_public_key, bytes):
+        return False
+    if not isinstance(signed.signature, bytes):
+        return False
+    try:
+        payload = _canonical_request(signed.request)
+        trusted_key = registry.get_public_key(signed.request.actor)
+        if trusted_key is None or trusted_key != signed.signer_public_key:
+            return False
+        public_key = Ed25519PublicKey.from_public_bytes(trusted_key)
+        public_key.verify(signed.signature, payload)
+    except (AuthorizationError, InvalidSignature, ValueError, TypeError, AttributeError):
+        return False
+    return True
 
 
 class ToolAdapter(Protocol):
@@ -53,7 +137,7 @@ class ReplayGuard:
 
 
 class EnforcementGateway:
-    """Verify authority and context before allowing a protected tool call.
+    """Verify authority and request ownership before allowing a protected call.
 
     The protected service must not be invocable with independent agent-held
     credentials. This gateway alone cannot prevent infrastructure-level bypass.
@@ -78,33 +162,27 @@ class EnforcementGateway:
         self._replay = replay_guard if replay_guard is not None else ReplayGuard()
         self._clock = clock
 
-    @staticmethod
-    def _validate_request(request: ActionRequest) -> None:
-        if not isinstance(request, ActionRequest):
-            raise AuthorizationError("A valid action request is required.")
-        fields = (
-            request.request_id, request.actor, request.action,
-            request.resource, request.audience, request.workflow_id,
-        )
-        if any(not isinstance(value, str) or not value.strip() for value in fields):
-            raise AuthorizationError("Every request field must be a non-empty string.")
-
     def execute(
         self,
         chain: list[SignedCapability] | tuple[SignedCapability, ...],
-        request: ActionRequest,
+        signed_request: SignedActionRequest,
         adapter: ToolAdapter,
     ) -> object:
-        """Execute only after all authorization checks have passed.
+        """Execute only after all authorization and proof-of-possession checks.
 
         The request ID is consumed before adapter invocation. If the adapter
         fails after receiving the request, the ID stays consumed to avoid
         accidental duplicate execution. Retryable services need their own
         idempotency protocol for uncertain outcomes.
         """
-        self._validate_request(request)
+        if not isinstance(signed_request, SignedActionRequest):
+            raise AuthorizationError("A signed action request is required.")
+        request = signed_request.request
+        _validate_action_request(request)
         if not callable(getattr(adapter, "execute", None)):
             raise AuthorizationError("A valid protected tool adapter is required.")
+        if not verify_action_request(signed_request, self._identities):
+            raise AuthorizationError("Action request signature or actor identity is invalid.")
         if not verify_delegation_chain(chain, self._identities):
             raise AuthorizationError("Delegation chain verification failed.")
 
