@@ -102,3 +102,20 @@ def test_signature_bytes_tampering_is_rejected(capability, keypair):
 def test_signing_requires_ed25519_private_key(capability):
     with pytest.raises(AuthorizationError, match="Ed25519 private key"):
         sign_capability(capability, object())
+
+
+def test_modified_execution_context_is_detected(capability, keypair):
+    private_key, public_key = keypair
+    contextual = replace(
+        capability,
+        audience="report-service",
+        workflow_id="review-2026",
+        expires_at=2_000_000_000,
+    )
+    signed = sign_capability(contextual, private_key)
+    modified = replace(contextual, audience="payment-service")
+
+    assert not verify_signed_capability(
+        replace(signed, capability=modified),
+        public_key,
+    )
