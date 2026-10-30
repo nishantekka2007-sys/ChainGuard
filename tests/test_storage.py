@@ -162,3 +162,17 @@ def test_store_migrates_existing_identity_table_without_active_column(tmp_path):
     assert registry.get_public_key("legacy-agent") == key
     registry.deactivate("legacy-agent")
     assert not registry.is_registered("legacy-agent")
+
+
+
+def test_identity_lookup_fails_closed_when_database_schema_is_unavailable(tmp_path):
+    database = tmp_path / "state.sqlite3"
+    registry = SQLiteIdentityRegistry(database)
+    key = Ed25519PrivateKey.generate().public_key().public_bytes_raw()
+    registry.register("agent-a", key)
+
+    with sqlite3.connect(database) as connection:
+        connection.execute("DROP TABLE trusted_identities")
+
+    with pytest.raises(AuthorizationError, match="Persistent identity state"):
+        registry.get_public_key("agent-a")
