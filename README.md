@@ -2,7 +2,6 @@
 
 [![Tests](https://github.com/nishantekka2007-sys/ChainGuard/actions/workflows/tests.yml/badge.svg)](https://github.com/nishantekka2007-sys/ChainGuard/actions/workflows/tests.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 **Verifiable authority delegation for multi-agent AI systems.**
 
@@ -124,4 +123,4 @@ Do not use this version to protect real accounts, funds, credentials, sensitive 
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+The package metadata currently declares the MIT License. A complete license file should be added after the project owner confirms the intended licensing terms.
