@@ -10,7 +10,7 @@ from uuid import uuid4
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from chainguard.core import delegate, issue_root_capability
-from chainguard.gateway import ActionRequest, EnforcementGateway
+from chainguard.gateway import ActionRequest, EnforcementGateway, sign_action_request
 from chainguard.identity import IdentityRegistry
 from chainguard.integrity import sign_capability
 from chainguard.revocation import RevocationRegistry
@@ -58,7 +58,8 @@ def main() -> None:
         workflow_id="quarterly-review-2026",
     )
 
-    result = gateway.execute(signed_chain, request, DemoReportTool())
+    signed_request = sign_action_request(request, analyst_key)
+    result = gateway.execute(signed_chain, signed_request, DemoReportTool())
     print(result)
 
 
