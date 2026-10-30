@@ -4,9 +4,9 @@ This document is intentionally explicit. A security prototype is more credible w
 
 ## Current implementation limitations
 
-- The identity registry is in-memory and assumes trusted enrollment.
-- The revocation registry is in-memory and process-local.
-- The replay guard is thread-safe only within one process; it has no durable or distributed state.
+- The default identity registry is in-memory. A SQLite-backed persistent registry is available, but enrollment still assumes an external trusted process.
+- The default revocation registry is in-memory. SQLite-backed revocation records persist across restarts and can be shared by local processes using one database file.
+- The default replay guard is process-local. A SQLite-backed replay guard provides durable single-host state shared by processes using one database file; it is not a distributed multi-host service.
 - Revocation checks and external tool execution are not one atomic transaction.
 - The gateway is a local Python boundary; infrastructure-level exclusivity and bypass prevention are not established.
 - The adapter contract receives a minimal action/resource request; real adapters must enforce exact operation semantics and safe parameter handling.
