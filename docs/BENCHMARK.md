@@ -32,7 +32,7 @@ The attack uses a legitimate registered issuer key. This is important: the case 
 |---|---|
 | B0 — no enforcement | Accept every request |
 | B1 — scope only | Check requested action/resource against the presented leaf capability |
-| B2 — signature only | Verify the leaf capability signature against the issuer's registered key |
+| B2 — signature verification | Verify the leaf capability signature using the registered issuer key |
 | B4 — full chain | Verify the complete signed chain and requested action/resource |
 | B5 — full gateway | Run the actual ChainGuard gateway, including actor proof, context, expiry, revocation and replay checks |
 

@@ -153,6 +153,45 @@ class SQLiteRevocationRegistry(RevocationRegistry):
         return row is not None
 
 
+
+class SQLiteAdmissionCoordinator:
+    """Serialize revocation-aware admission and replay consumption on one host.
+
+    All gateways and revocation writers must use the same SQLite database file.
+    This establishes admission ordering only: a request admitted before a later
+    revocation may still execute or complete after that revoke.
+    """
+
+    def __init__(self, database: str | Path, *, timeout: float = 10.0) -> None:
+        self.store = SQLiteStateStore(database, timeout=timeout)
+
+    def admit(self, capability: Capability, request_id: str) -> None:
+        """Atomically reject revoked lineage or consume the request ID."""
+        if not isinstance(capability, Capability):
+            raise AuthorizationError("A valid capability is required.")
+        if not isinstance(request_id, str) or not request_id.strip():
+            raise AuthorizationError("Request ID must be a non-empty string.")
+
+        lineage = capability.ancestor_ids + (capability.capability_id,)
+        placeholders = ",".join("?" for _ in lineage)
+        try:
+            with self.store.connect() as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                revoked = connection.execute(
+                    f"SELECT 1 FROM revoked_capabilities "
+                    f"WHERE capability_id IN ({placeholders}) LIMIT 1",
+                    lineage,
+                ).fetchone()
+                if revoked is not None:
+                    raise AuthorizationError("Capability is revoked or inactive.")
+                connection.execute(
+                    "INSERT INTO consumed_requests(request_id) VALUES (?)",
+                    (request_id.strip(),),
+                )
+        except sqlite3.IntegrityError as exc:
+            raise AuthorizationError("Request replay detected.") from exc
+
+
 class SQLiteReplayGuard:
     """Durable replay guard shared by gateway instances using the same DB."""
 

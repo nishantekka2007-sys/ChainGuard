@@ -63,6 +63,8 @@ The Python gateway now provides a local enforcement boundary for a supplied adap
 | Gateway checks before adapter execution | Implemented |
 | Audience, workflow and expiry binding | Implemented |
 | In-memory and SQLite-backed replay guards | Implemented |
+| SQLite-serialized admission and revocation ordering (single host) | Implemented, opt-in |
+| Dispatch-time fencing at a remote protected service | Not implemented |
 | Distributed multi-host identity and revocation | Planned |
 | Distributed replay/idempotency and multi-host consistency | Planned |
 | Production tool adapters and infrastructure bypass prevention | Planned |
@@ -94,7 +96,9 @@ pytest -v
 python examples/minimal_gateway.py
 ```
 
-See [Architecture](docs/ARCHITECTURE.md) for the design and [Threat Model](docs/THREAT_MODEL.md) for assumptions, and [Persistence](docs/PERSISTENCE.md) for the SQLite option. A runnable educational example is available at [examples/minimal_gateway.py](examples/minimal_gateway.py).
+See [Revocation admission semantics](docs/REVOCATION_ADMISSION.md) for the optional single-host SQLite admission coordinator. The default gateway path retains point-in-time revocation checks.
+
+See [Architecture](docs/ARCHITECTURE.md) for the design and [Threat Model](docs/THREAT_MODEL.md) for assumptions, and [Persistence](docs/PERSISTENCE.md) for the SQLite option. Runnable educational examples are available at [examples/minimal_gateway.py](examples/minimal_gateway.py) and [examples/sqlite_admission.py](examples/sqlite_admission.py).
 
 ## Research and design documents
 
@@ -106,6 +110,7 @@ See [Architecture](docs/ARCHITECTURE.md) for the design and [Threat Model](docs/
 - [Experiment plan](docs/EXPERIMENT_PLAN.md) — baselines, attack suite, metrics, and controls.
 - [Benchmark guide](docs/BENCHMARK.md) — run the initial reproducible synthetic baseline comparison.
 - [Revocation consistency contract](docs/REVOCATION_CONSISTENCY.md) — define admission, dispatch, and completion semantics before mitigation.
+- [Revocation admission semantics](docs/REVOCATION_ADMISSION.md) — atomic single-host admission ordering and its limits.
 - [Revocation TOCTOU experiment](docs/REVOCATION_TOCTOU.md) — reproduce the check/use gap around revocation and adapter execution.
 - [Limitations](docs/LIMITATIONS.md) — current gaps, residual risks, and claim discipline.
 - [Security policy](SECURITY.md) — responsible vulnerability reporting.

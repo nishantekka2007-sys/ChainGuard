@@ -21,7 +21,7 @@ A capability identifies:
 - permitted actions and resources;
 - its parent capability and recorded ancestors.
 
-The prototype implements capability modelling, Ed25519 integrity, issuer identity lookup, chain verification, ancestor-aware revocation, a local enforcement gateway, actor-signed requests, audience/workflow/expiry checks, and replay protection. Identity, revocation, and replay state can use either in-memory registries or SQLite-backed persistent registries for single-host deployments.
+The prototype implements capability modelling, Ed25519 integrity, issuer identity lookup, chain verification, ancestor-aware revocation, a local enforcement gateway, actor-signed requests, audience/workflow/expiry checks, and replay protection. Identity, revocation, and replay state can use either in-memory registries or SQLite-backed persistent registries for single-host deployments. An optional SQLiteAdmissionCoordinator serializes revocation-aware admission and replay consumption in one local database transaction.
 
 ## 3. Security objectives
 
@@ -32,7 +32,7 @@ ChainGuard should enforce these properties at the protected-operation boundary:
 3. **Valid delegation:** a child issuer is the subject of the immediately preceding parent capability.
 4. **Lineage integrity:** parent IDs and ancestor IDs form the exact chain presented for verification.
 5. **Root continuity:** every capability in a chain descends from the same root principal.
-6. **Revocation effectiveness:** a revoked capability and its descendants cannot authorize protected operations.
+6. **Revocation effectiveness:** a capability revoked before admission, and its descendants, cannot be newly admitted; work admitted before the revoke may continue under the selected contract.
 7. **Fail-closed authorization:** malformed, unverifiable, expired, revoked, or context-mismatched authority is rejected.
 8. **No enforcement bypass:** protected credentials and operations are accessible only through the enforcement boundary.
 

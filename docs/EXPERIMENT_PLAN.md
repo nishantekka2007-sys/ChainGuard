@@ -1,9 +1,9 @@
 # ChainGuard Experiment Plan
 
-**Status:** Initial plan  
+**Status:** Research prototype evaluation plan  
 **Version:** 0.2
 
-The initial executable synthetic benchmark is documented in [BENCHMARK.md](BENCHMARK.md). It currently covers one benign read and one downstream scope-escalation case across B0, B1, B2, B4, and B5. It does not yet implement the full workload or all baselines described below.
+The current executable synthetic benchmark is documented in [BENCHMARK.md](BENCHMARK.md). It currently covers one benign read and one downstream scope-escalation case across B0, B1, B2, B4, and B5. It is a narrow synthetic microbenchmark, not a full workload or broad evaluation. The optional SQLite admission coordinator is evaluated separately by deterministic tests.
 
 ## 1. Evaluation questions
 

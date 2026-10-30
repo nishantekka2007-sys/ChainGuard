@@ -1,6 +1,6 @@
 # Persistent State with SQLite
 
-ChainGuard can use SQLite to persist trusted public keys, revoked capability IDs, and consumed request IDs across process restarts.
+ChainGuard can use SQLite to persist trusted public keys, revoked capability IDs, and consumed request IDs across process restarts. An optional SQLite admission coordinator atomically checks revocation lineage and consumes a request ID in one write transaction.
 
 This is a **single-host persistence option**, not a distributed authorization service.
 
@@ -33,7 +33,11 @@ gateway = EnforcementGateway(
 
 Register each principal's public key through an authenticated enrollment process before accepting its capabilities. The SQLite registry refuses to silently replace an identity's existing key.
 
-The same database path must be supplied to all three stores. Use a local filesystem path accessible to the gateway process. Keep the database and its backups protected by operating-system permissions and operational controls.
+For serialized admission, supply the same database path to the identity, revocation, and replay stores and to SQLiteAdmissionCoordinator. Use a local filesystem path accessible to the gateway process. Keep the database and its backups protected by operating-system permissions and operational controls.
+
+## Serialized admission (optional)
+
+Pass SQLiteAdmissionCoordinator(database) as the gateway's admission_coordinator argument. It uses BEGIN IMMEDIATE to serialize the revocation check and request-ID consumption against revocation writes on the same database. This defines admission ordering: an operation admitted before a later revoke may still execute or complete after the revoke. It does not provide dispatch-time fencing or cancellation. See [Revocation admission semantics](REVOCATION_ADMISSION.md).
 
 ## What persists?
 

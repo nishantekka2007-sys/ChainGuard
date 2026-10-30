@@ -1,6 +1,6 @@
 # Revocation Consistency Contract
 
-**Status:** Design decision required; no stronger guarantee is implemented  
+**Status:** Admission ordering selected and implemented as an optional single-host SQLite mode  
 **Related experiment:** [Revocation TOCTOU](REVOCATION_TOCTOU.md)
 
 ## 1. Why this contract is necessary
@@ -43,18 +43,18 @@ This is stronger than dispatch ordering. It requires tracking and draining or ca
 
 ## 4. Current prototype guarantee
 
-The current implementation provides a point-in-time gateway check only:
+The default gateway path provides a point-in-time check only. When SQLiteAdmissionCoordinator is configured with the same database used by revocation writers, admission and revocation are serialized under Contract A:
 
-- If revocation is visible when the gateway checks, the request is rejected.
-- If revocation commits after that check, the in-flight request may still reach the adapter.
+- If revocation commits before the admission transaction, the request is rejected.
+- If admission commits first, the request may still reach the adapter or complete after a later revoke.
 - SQLite persistence does not close this gap; a transaction in the revocation store cannot make an unrelated adapter side effect atomic.
 - No distributed freshness, fencing, cancellation, or completion barrier is currently established.
 
-Therefore the prototype currently satisfies neither a demonstrated dispatch-ordering guarantee nor a completion barrier under concurrent revocation.
+The prototype has a tested single-host admission-ordering mode, but does not satisfy a dispatch-ordering guarantee or completion barrier under concurrent revocation.
 
-## 5. Decision required before mitigation
+## 5. Selected prototype contract: admission ordering
 
-The research team must select the required contract for a stated deployment model:
+For the current research prototype, select Contract A (admission ordering) for the explicitly limited single-host SQLite deployment. Contract B and Contract C remain future research work. The deployment assumptions are:
 
 | Question | Why it matters |
 |---|---|
@@ -65,7 +65,7 @@ The research team must select the required contract for a stated deployment mode
 | Can the protected service validate a token/epoch itself? | Determines whether enforcement can be placed at the actual side-effect boundary |
 | What happens when the service is unavailable or its outcome is unknown? | Defines fail-closed behavior, retries, and idempotency |
 
-Do not implement a lock, transaction, or epoch mechanism until these answers are explicit. Each candidate should be evaluated against the same event ordering and tested at the real adapter/service boundary.
+The optional SQLiteAdmissionCoordinator implements Contract A by checking revocation lineage and consuming the request ID inside one BEGIN IMMEDIATE transaction. This is serialized against revocation writes using the same database. It does not establish Contract B or Contract C. Each stronger candidate still requires tests at the actual protected-service boundary.
 
 ## 6. Minimum falsification tests
 
@@ -85,3 +85,8 @@ Record R, A, D, S, and C ordering, whether the side effect began, whether it com
 ## 7. Research boundary
 
 This contract is a design and evaluation framework, not a claim that any candidate mechanism has been implemented or proven. Results must state the selected contract, deployment assumptions, service boundary, and tested failure modes.
+
+
+## 8. Implementation reference
+
+See [REVOCATION_ADMISSION.md](REVOCATION_ADMISSION.md) for the implemented admission contract, configuration requirements, and single-host constraints.
