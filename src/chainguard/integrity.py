@@ -1,10 +1,4 @@
-"""Ed25519 integrity protection for ChainGuard capabilities.
-
-A valid signature proves that the holder of a particular private key signed
-the exact capability payload. It does not, by itself, prove that the key is
-authorized to represent the capability issuer. Callers must supply a trusted
-public key obtained from an authenticated identity/key registry.
-"""
+"""Ed25519 integrity protection for ChainGuard capabilities."""
 
 from dataclasses import dataclass
 import json
@@ -32,7 +26,6 @@ def _canonical_payload(capability: Capability) -> bytes:
     """Encode every authority-bearing field in a deterministic format."""
     if not isinstance(capability, Capability):
         raise AuthorizationError("A valid capability is required.")
-
     payload = {
         "capability_id": capability.capability_id,
         "root_principal": capability.root_principal,
@@ -42,12 +35,12 @@ def _canonical_payload(capability: Capability) -> bytes:
         "resources": sorted(capability.resources),
         "parent_id": capability.parent_id,
         "ancestor_ids": list(capability.ancestor_ids),
+        "audience": capability.audience,
+        "workflow_id": capability.workflow_id,
+        "expires_at": capability.expires_at,
     }
     return json.dumps(
-        payload,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     ).encode("utf-8")
 
 
@@ -65,12 +58,10 @@ def sign_capability(
     """Sign the canonical representation of a capability."""
     if not isinstance(private_key, Ed25519PrivateKey):
         raise AuthorizationError("A valid Ed25519 private key is required.")
-
     payload = _canonical_payload(capability)
-    public_key = private_key.public_key()
     return SignedCapability(
         capability=capability,
-        signer_public_key=_raw_public_key(public_key),
+        signer_public_key=_raw_public_key(private_key.public_key()),
         signature=private_key.sign(payload),
     )
 
@@ -79,22 +70,20 @@ def verify_signed_capability(
     signed: SignedCapability,
     trusted_public_key: bytes,
 ) -> bool:
-    """Verify signature integrity and that the signer key is trusted.
-
-    Returns False for invalid signatures, malformed records, or a signer key
-    that does not match the caller-provided trusted key.
-    """
+    """Verify signature integrity and that the signer key is trusted."""
     if not isinstance(signed, SignedCapability):
         return False
     if not isinstance(trusted_public_key, bytes):
         return False
+    if not isinstance(signed.signer_public_key, bytes):
+        return False
     if signed.signer_public_key != trusted_public_key:
         return False
-
+    if not isinstance(signed.signature, bytes):
+        return False
     try:
         public_key = Ed25519PublicKey.from_public_bytes(trusted_public_key)
         public_key.verify(signed.signature, _canonical_payload(signed.capability))
     except (InvalidSignature, ValueError, TypeError, AuthorizationError):
         return False
-
     return True
