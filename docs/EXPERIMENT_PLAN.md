@@ -1,7 +1,9 @@
 # ChainGuard Experiment Plan
 
 **Status:** Initial plan  
-**Version:** 0.1
+**Version:** 0.2
+
+The initial executable synthetic benchmark is documented in [BENCHMARK.md](BENCHMARK.md). It currently covers one benign read and one downstream scope-escalation case across B0, B1, B2, B4, and B5. It does not yet implement the full workload or all baselines described below.
 
 ## 1. Evaluation questions
 
