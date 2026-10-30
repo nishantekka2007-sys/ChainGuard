@@ -95,3 +95,14 @@ Security controls should preserve valid task execution with measurable overhead.
 - **Formally analysed:** supported by proof or model checking under stated assumptions.
 
 Do not describe a property as guaranteed unless evidence and assumptions justify that wording.
+
+
+## P10 — Request proof of possession
+
+A protected action request must be signed by the private key registered to the claimed actor. The signature covers the request ID, actor, action, resource, audience, and workflow ID.
+
+**Prototype status:** Implemented in the local gateway using Ed25519 and the in-memory identity registry.
+
+**Falsification test:** change any signed request field after signing, claim another actor, or sign with an unregistered key. The adapter must not be invoked.
+
+**Limitation:** this proves possession of the registered signing key for the request. It does not protect a compromised agent that legitimately controls that key, nor does it replace transport security or secure key storage.
