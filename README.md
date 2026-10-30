@@ -6,7 +6,7 @@ A research prototype investigating verifiable authority delegation in autonomous
 
 Can a system ensure that every action in a multi-agent delegation chain remains within the scope originally authorized by a human, even when a downstream agent is compromised?
 
-## Initial security properties
+## Security properties under development
 
 **Scope attenuation:** a child agent must never receive more permissions than its parent possesses.
 
@@ -17,6 +17,8 @@ For a parent capability \(P\) and child capability \(C\):
 
 **Ancestor-aware revocation:** revoking a capability invalidates that capability and every descendant in its recorded delegation chain.
 
+**Capability integrity:** Ed25519 signatures detect changes to the signed capability fields. Verification also requires the caller to provide the expected trusted public key.
+
 ## Project status
 
 Early research prototype. The repository is being developed in small, tested sets:
@@ -24,15 +26,19 @@ Early research prototype. The repository is being developed in small, tested set
 1. Project scaffold and development configuration
 2. Authorization model and scope-attenuation tests
 3. In-memory, ancestor-aware capability revocation
-4. Cryptographic capability integrity and delegation-chain binding
+4. Ed25519 capability signing and tamper detection
 5. Runtime action enforcement
-6. Replay resistance, execution-context binding, and threat simulations
+6. Persistent revocation, replay resistance, execution-context binding, and threat simulations
 
-## Scope and limitations
+## Cryptographic design and limitations
 
-ChainGuard is an experimental security research project. The current revocation registry is in-memory and process-local. It does not provide persistence, distributed consistency, authenticated revocation messages, or cryptographic protection. Capability objects are not yet tamper-resistant. These are explicit limitations, not solved properties.
+The current integrity layer signs a deterministic JSON representation of all authority-bearing capability fields, including the parent and ancestor identifiers. Ed25519 signing and verification use the Python `cryptography` package and the API documented by [PyCA cryptography](https://cryptography.io/en/latest/hazmat/primitives/asymmetric/ed25519/).
 
-Do not use this prototype to protect real accounts, funds, credentials, or production systems. Do not commit secrets, private keys, access tokens, or local environment files.
+A valid signature proves that the corresponding private key signed the payload. It does **not** prove that the key belongs to the claimed issuer. The caller must obtain the expected public key from a trusted identity/key registry. Key distribution, storage, rotation, delegation-chain signature verification, and production key protection are not yet implemented.
+
+The revocation registry is in-memory and process-local. Capability objects and signatures are not yet integrated into a runtime action-enforcement boundary. This is a research prototype, not a production security control.
+
+Do not use this prototype to protect real accounts, funds, credentials, or production systems. Never commit private keys, access tokens, or local environment files.
 
 ## Development
 
