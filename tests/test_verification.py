@@ -51,8 +51,7 @@ def test_valid_root_and_delegated_chain_verifies():
 
 
 def test_issuer_signature_must_match_registered_identity():
-    registry, _, agent_a_key, _, child, _, _ = setup_chain()
-    # The child claims agent-a as issuer but is signed by agent-b's key.
+    registry, _, _, _, child, _, _ = setup_chain()
     forged = sign_capability(child, Ed25519PrivateKey.generate())
 
     assert not verify_capability_issuer(forged, registry)
@@ -68,9 +67,7 @@ def test_unregistered_issuer_is_rejected():
 
 
 def test_valid_signature_does_not_authorize_scope_escalation():
-    registry, _, agent_a_key, root, child, signed_root, _ = setup_chain()
-    # Agent A signs the forged scope with its genuine key. The signature is
-    # authentic, but the child exceeds the root's granted action scope.
+    registry, _, agent_a_key, _, child, signed_root, _ = setup_chain()
     escalated = replace(
         child,
         actions=frozenset({"read", "transfer_money"}),
@@ -108,3 +105,27 @@ def test_resource_escalation_is_rejected_even_with_valid_signature():
     signed_forged = sign_capability(forged, agent_a_key)
 
     assert not verify_delegation_chain([signed_root, signed_forged], registry)
+
+
+def test_malformed_capability_object_is_rejected_without_exception():
+    registry, _, _, _, _, signed_root, _ = setup_chain()
+    malformed = replace(signed_root, capability=object())
+
+    assert not verify_capability_issuer(malformed, registry)
+    assert not verify_delegation_chain([malformed], registry)
+
+
+def test_duplicate_capability_ids_in_chain_are_rejected():
+    registry, _, agent_a_key, root, _, signed_root, _ = setup_chain()
+    duplicate = replace(
+        root,
+        issuer="agent-a",
+        subject="agent-b",
+        parent_id=root.capability_id,
+        ancestor_ids=(root.capability_id,),
+    )
+    signed_duplicate = sign_capability(duplicate, agent_a_key)
+
+    assert not verify_delegation_chain(
+        [signed_root, signed_duplicate], registry
+    )
