@@ -67,7 +67,7 @@ Revoking a capability invalidates that capability and descendants whose ancestry
 
 ### Enforcement gateway
 
-The gateway checks the complete chain, actor, action, resource, audience, workflow, expiry, and revocation state before invoking a tool adapter. It also consumes a unique request ID through a thread-safe, process-local replay guard.
+The gateway checks the complete chain and verifies an Ed25519-signed action request against the trusted key registered for the claimed actor. It then checks actor, action, resource, audience, workflow, expiry, and revocation state before invoking a tool adapter. It also consumes a unique request ID through a thread-safe, process-local replay guard.
 
 The gateway consumes a request ID before calling the adapter. If the adapter fails after invocation, the ID remains consumed. This is an at-most-once attempt policy, not exactly-once delivery. External adapters need their own idempotency protocol for uncertain outcomes.
 
