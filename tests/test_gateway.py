@@ -4,7 +4,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from chainguard.core import AuthorizationError, delegate, issue_root_capability
-from chainguard.gateway import ActionRequest, EnforcementGateway, sign_action_request
+from chainguard.gateway import ActionRequest, EnforcementGateway, ReplayGuard, sign_action_request
 from chainguard.identity import IdentityRegistry
 from chainguard.integrity import sign_capability
 from chainguard.revocation import RevocationRegistry
@@ -220,4 +220,30 @@ def test_concurrent_replay_allows_only_one_adapter_execution(environment):
 
     assert outcomes.count("allowed") == 1
     assert outcomes.count("rejected") == 7
+    assert len(adapter.calls) == 1
+
+
+
+def test_revocation_after_gateway_check_can_precede_adapter_execution(environment):
+    """Document the current TOCTOU gap; this is an expected limitation test."""
+    _, identities, revocations, root, _, chain, agent_b_key = environment
+
+    class RevokeImmediatelyAfterActiveCheck(ReplayGuard):
+        def consume(self, request_id):
+            super().consume(request_id)
+            # Gateway calls consume only after require_active() has returned.
+            revocations.revoke(root)
+
+    gateway = EnforcementGateway(
+        identities,
+        revocations,
+        replay_guard=RevokeImmediatelyAfterActiveCheck(),
+        clock=lambda: 1_900_000_000,
+    )
+    adapter = RecordingAdapter()
+
+    result = gateway.execute(chain, signed_request(agent_b_key, "late-revoke"), adapter)
+
+    assert result == {"executed": "read", "resource": "report-1"}
+    assert revocations.is_revoked(root)
     assert len(adapter.calls) == 1
