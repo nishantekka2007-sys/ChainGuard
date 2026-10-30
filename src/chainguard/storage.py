@@ -6,8 +6,10 @@ consensus service and does not make revocation plus an external side effect
 atomic.
 """
 
+from contextlib import contextmanager
 from pathlib import Path
 import sqlite3
+from collections.abc import Iterator
 
 from chainguard.core import AuthorizationError, Capability
 from chainguard.identity import IdentityRegistry
@@ -62,12 +64,20 @@ class SQLiteStateStore:
                 """
             )
 
-    def connect(self) -> sqlite3.Connection:
-        """Open a connection with foreign-key and busy-timeout protections."""
+    @contextmanager
+    def connect(self) -> Iterator[sqlite3.Connection]:
+        """Yield a configured connection and always close it after the transaction."""
         connection = sqlite3.connect(self.database, timeout=self.timeout)
-        connection.execute(f"PRAGMA busy_timeout = {int(self.timeout * 1000)}")
-        connection.execute("PRAGMA foreign_keys = ON")
-        return connection
+        try:
+            connection.execute(f"PRAGMA busy_timeout = {int(self.timeout * 1000)}")
+            connection.execute("PRAGMA foreign_keys = ON")
+            yield connection
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
 
 
 class SQLiteIdentityRegistry(IdentityRegistry):
