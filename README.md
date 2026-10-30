@@ -63,7 +63,8 @@ The Python gateway now provides a local enforcement boundary for a supplied adap
 | Gateway checks before adapter execution | Implemented |
 | Audience, workflow and expiry binding | Implemented |
 | In-memory and SQLite-backed replay guards | Implemented |
-| SQLite-serialized admission and revocation ordering (single host) | Implemented, opt-in |\n| Dispatch-time fencing at a remote protected service | Not implemented |\n| Distributed multi-host identity and revocation | Planned |
+| SQLite-serialized admission and revocation ordering (single host) | Implemented, opt-in |
+| Dispatch-time fencing at a remote protected service | Not implemented |\n| Distributed multi-host identity and revocation | Planned |
 | Distributed replay/idempotency and multi-host consistency | Planned |
 | Production tool adapters and infrastructure bypass prevention | Planned |
 | Initial synthetic baseline benchmark | Implemented |
