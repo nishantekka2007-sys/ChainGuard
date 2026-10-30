@@ -3,7 +3,7 @@ from research.benchmark import run_benchmark
 
 def test_benchmark_reports_expected_security_and_benign_outcomes():
     report = run_benchmark(trials=3)
-    assert report["benchmark"] == "chainguard_synthetic_baseline_v1"
+    assert report["benchmark"] == "chainguard_synthetic_baseline_v2"
     assert report["trials_per_scenario"] == 3
 
     outcomes = {

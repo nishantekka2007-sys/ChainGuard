@@ -122,11 +122,13 @@ def _authorize(
     trial: Trial,
     identities: IdentityRegistry,
     iteration: int,
-    actor_private_key: Ed25519PrivateKey,
+    signed_request: SignedActionRequest,
+    gateway: EnforcementGateway | None,
+    adapter: _NoOpAdapter,
 ) -> bool:
     leaf = trial.chain[-1]
     capability = leaf.capability
-    request = trial.signed_request.request
+    request = signed_request.request
 
     if baseline == "B0_no_enforcement":
         return True
@@ -143,20 +145,10 @@ def _authorize(
             and request.resource in capability.resources
         )
     if baseline == "B5_full_gateway":
-        gateway = EnforcementGateway(
-            identities, RevocationRegistry(), replay_guard=ReplayGuard(),
-            clock=lambda: 1_900_000_000,
-        )
-        request_with_unique_id = ActionRequest(
-            f"{request.request_id}-{iteration}", request.actor, request.action,
-            request.resource, request.audience, request.workflow_id,
-        )
-        signed = sign_action_request(
-            request_with_unique_id,
-            actor_private_key,
-        )
+        if gateway is None:
+            raise ValueError("The full-gateway baseline requires a prepared gateway")
         try:
-            gateway.execute(trial.chain, signed, _NoOpAdapter())
+            gateway.execute(trial.chain, signed_request, adapter)
             return True
         except AuthorizationError:
             return False
@@ -190,9 +182,31 @@ def run_benchmark(trials: int = 100) -> dict[str, object]:
         for scenario in scenarios:
             durations: list[float] = []
             accepted = 0
+            # Exclude gateway construction and request signing from the measured
+            # authorization decision path. Reuse one gateway and adapter, while
+            # assigning a fresh request ID to each single-use execution.
+            gateway = (
+                EnforcementGateway(
+                    identities, RevocationRegistry(), replay_guard=ReplayGuard(),
+                    clock=lambda: 1_900_000_000,
+                )
+                if baseline == "B5_full_gateway" else None
+            )
+            adapter = _NoOpAdapter()
             for iteration in range(trials):
+                request = scenario.signed_request.request
+                signed = scenario.signed_request
+                if baseline == "B5_full_gateway":
+                    unique_request = ActionRequest(
+                        f"{request.request_id}-{iteration}", request.actor,
+                        request.action, request.resource, request.audience,
+                        request.workflow_id,
+                    )
+                    signed = sign_action_request(unique_request, actor_key)
                 start = time.perf_counter_ns()
-                allowed = _authorize(baseline, scenario, identities, iteration, actor_key)
+                allowed = _authorize(
+                    baseline, scenario, identities, iteration, signed, gateway, adapter
+                )
                 durations.append((time.perf_counter_ns() - start) / 1_000_000)
                 accepted += int(allowed)
 
@@ -221,7 +235,11 @@ def run_benchmark(trials: int = 100) -> dict[str, object]:
             ))
 
     return {
-        "benchmark": "chainguard_synthetic_baseline_v1",
+        "benchmark": "chainguard_synthetic_baseline_v2",
+        "measurement_boundary": (
+            "Gateway construction and action-request signing are excluded from "
+            "decision latency; one gateway and adapter are reused per scenario."
+        ),
         "warning": (
             "Synthetic microbenchmark only. It covers one benign request and "
             "one signed downstream scope-escalation attack; results are not "
