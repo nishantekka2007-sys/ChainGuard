@@ -17,7 +17,7 @@ For parent P and child C, C.actions and C.resources must be subsets of the corre
 
 Every capability signature must verify under the trusted public key registered for its claimed issuer.
 
-**Prototype status:** Implemented with Ed25519 and either an in-memory or SQLite-backed identity registry.
+**Prototype status:** Implemented with Ed25519 and either an in-memory or SQLite-backed identity registry. SQLite identities support key rotation and deactivation.
 
 **Falsification test:** claim another issuer, use an unknown issuer, substitute a key, or tamper with signed fields.
 
@@ -115,3 +115,14 @@ When SQLite mode is configured, registered public keys, revocation records, and 
 **Prototype status:** Implemented for single-host SQLite storage; restart and concurrent replay integration tests are included.
 
 **Limitation:** not a distributed consistency guarantee. Database compromise or rollback can undermine the state assumptions.
+
+
+## P12 — Identity key lifecycle
+
+An identity's active public key can be explicitly rotated or deactivated. After rotation, signatures made with the previous key must fail verification against the current registry. After deactivation, the identity must no longer authenticate capabilities or action requests.
+
+**Prototype status:** Implemented for the SQLite registry with transactional rotation, deactivation, and public-key rotation history.
+
+**Falsification test:** verify an old signature before rotation, rotate to a new key, and confirm the old signature fails while a new signature succeeds; deactivate an identity and confirm its signatures fail.
+
+**Limitation:** authenticated enrollment, production key custody, KMS/HSM integration, multi-party approval, and distributed key state are not implemented.
