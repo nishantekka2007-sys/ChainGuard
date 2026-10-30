@@ -89,9 +89,4 @@ This contract is a design and evaluation framework, not a claim that any candida
 
 ## 8. Implementation reference
 
-See [REVOCATION_ADMISSION.md](REVOCATION_ADMISSION.md) for the implemented SQLite admission contract, configuration requirements, and deterministic tests.
-
-
-## 8. Implementation reference
-
-See [REVOCATION_ADMISSION.md](REVOCATION_ADMISSION.md) for the implemented admission contract and its single-host constraints.
+See [REVOCATION_ADMISSION.md](REVOCATION_ADMISSION.md) for the implemented admission contract, configuration requirements, and single-host constraints.
