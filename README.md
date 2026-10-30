@@ -67,7 +67,8 @@ The Python gateway now provides a local enforcement boundary for a supplied adap
 | Distributed multi-host identity and revocation | Planned |
 | Distributed replay/idempotency and multi-host consistency | Planned |
 | Production tool adapters and infrastructure bypass prevention | Planned |
-| Structured audit trail and adversarial benchmark | Planned |
+| Initial deterministic adversarial gateway test lab | Implemented |
+| Structured audit trail and measured adversarial benchmark | Planned |
 
 ## Security checks performed by the gateway
 
@@ -103,6 +104,7 @@ See [Architecture](docs/ARCHITECTURE.md) for the design and [Threat Model](docs/
 - [Key lifecycle](docs/KEY_MANAGEMENT.md) — key rotation, deactivation, and trust assumptions.
 - [Threat model](docs/THREAT_MODEL.md) — attacker capabilities, assumptions, and out-of-scope cases.
 - [Security properties](docs/SECURITY_PROPERTIES.md) — properties and falsification tests.
+- [Adversarial test lab](docs/ADVERSARIAL_TEST_LAB.md) — executable attack cases, interpretation rules, and next gaps.
 - [Research proposal](docs/RESEARCH_PROPOSAL.md) — question, hypothesis, contributions, and method.
 - [Experiment plan](docs/EXPERIMENT_PLAN.md) — baselines, attack suite, metrics, and controls.
 - [Limitations](docs/LIMITATIONS.md) — current gaps, residual risks, and claim discipline.
