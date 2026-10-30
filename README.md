@@ -2,16 +2,17 @@
 
 [![Tests](https://github.com/nishantekka2007-sys/ChainGuard/actions/workflows/tests.yml/badge.svg)](https://github.com/nishantekka2007-sys/ChainGuard/actions/workflows/tests.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![Security: research prototype](https://img.shields.io/badge/security-research%20prototype-orange)](docs/LIMITATIONS.md)
 
 **Verifiable authority delegation for multi-agent AI systems.**
 
-ChainGuard is an open research prototype exploring how to keep delegated agent permissions within the authority originally granted by a human. It models delegation as a chain of cryptographically signed capabilities and is being developed toward enforcement at the actual tool-execution boundary.
+ChainGuard is an open research prototype exploring how to keep delegated agent permissions within the authority originally granted by a human. It combines signed capabilities, identity-bound delegation-chain verification, context restrictions, revocation checks, and a protected-operation gateway.
 
-> **In plain language:** an AI agent should not be able to give another agent more power than it has—and a tool should check that authority before it performs an action.
+> **In plain language:** an AI agent should not be able to give another agent more power than it has—and a protected tool should check that authority before it performs an action.
 
 ## Why this matters
 
-Multi-agent systems divide work among agents and tools. When one downstream agent is compromised, poorly constrained delegation can let it request actions beyond the original authorization. A signature alone is not enough: it can show who signed a capability, but not whether that issuer was allowed to grant the requested permissions.
+Multi-agent systems divide work among agents and tools. When a downstream agent is compromised, poorly constrained delegation can let it request actions beyond the original authorization. A signature alone is not enough: it can show who signed a capability, but not whether that issuer was allowed to grant the requested permissions.
 
 ChainGuard separates **who signed it** from **whether the delegation is authorized**.
 
@@ -24,35 +25,30 @@ This is a research question—not a claim that ChainGuard already guarantees sec
 ## How it works
 
 ```text
-Human grants initial authority
-            |
-            v
-       Agent A
-            |
-     delegates a narrower scope
-            v
-       Agent B
-            |
-     delegates a narrower scope
-            v
-       Agent C
-            |
-      requests an action
-            v
-     ChainGuard Gateway
-       |   |   |   |
-       |   |   |   +-- context and replay checks
-       |   |   +------ revocation check
-       |   +---------- trusted issuer identity
-       +-------------- signature, chain and scope checks
-            |
-       allow or deny
-            |
-            v
-       Protected tool
+Human grants a scoped capability
+              |
+              v
+          Agent A
+              |
+       delegates narrower scope
+              v
+          Agent B
+              |
+        requests an action
+              v
+       ChainGuard Gateway
+        |      |       |
+        |      |       +-- expiry, audience and workflow checks
+        |      +---------- revocation and replay checks
+        +----------------- signature, identity, chain and scope checks
+              |
+        allow only if all checks pass
+              |
+              v
+        Protected tool adapter
 ```
 
-The gateway is part of the target architecture. It is **not yet implemented**. The diagram must not be read as a claim that current releases already mediate real tool calls.
+The Python gateway now provides a local enforcement boundary for a supplied adapter. A real deployment must still ensure that the protected service cannot be called directly with agent-held credentials.
 
 ## Current implementation
 
@@ -60,39 +56,30 @@ The gateway is part of the target architecture. It is **not yet implemented**. T
 |---|---|
 | Immutable capability model | Implemented |
 | Action and resource scope attenuation | Implemented |
-| Ed25519 capability signing and verification | Implemented |
+| Ed25519 signing of authority and context fields | Implemented |
 | In-memory identity-to-key registry | Implemented |
 | Authorization-aware delegation-chain verification | Implemented |
 | In-memory ancestor-aware revocation | Implemented |
-| Runtime enforcement gateway | Planned |
-| Persistent/distributed revocation | Planned |
-| Expiry and replay protection | Planned |
-| Audience and workflow-context binding | Planned |
-| Structured audit trail | Planned |
-| Adversarial benchmark suite | Planned |
+| Gateway checks before adapter execution | Implemented |
+| Audience, workflow and expiry binding | Implemented |
+| Thread-safe, process-local replay guard | Implemented |
+| Durable/distributed identity and revocation | Planned |
+| Durable replay/idempotency and multi-instance consistency | Planned |
+| Production tool adapters and infrastructure bypass prevention | Planned |
+| Structured audit trail and adversarial benchmark | Planned |
 
-## Security model
+## Security checks performed by the gateway
 
-The current prototype checks:
-- **Scope attenuation:** child actions and resources must be subsets of the parent's.
-- **Signature integrity:** signed capability fields cannot be changed without invalidating the signature.
-- **Issuer identity:** the signature must match the trusted key registered for the claimed issuer.
-- **Delegation authorization:** each child must be issued by the previous capability's subject.
-- **Lineage and root continuity:** parent IDs, ancestor IDs, and root principal must form a consistent chain.
-- **Ancestor-aware revocation:** revoking a capability invalidates descendants that record it in their lineage.
+Before calling the adapter, the gateway verifies:
+1. the complete signed delegation chain;
+2. that the request actor is the final capability subject;
+3. that the requested action and resource are within the final scope;
+4. that audience and workflow match the signed capability context;
+5. that the capability has not expired;
+6. that the capability or any ancestor has not been revoked;
+7. that the request ID has not already been consumed.
 
-A valid signature proves that a key signed a payload. It does not, by itself, prove that the signer was authorized to delegate the requested scope.
-
-## Research and design documents
-
-Start here if you want to understand the project in depth:
-
-- [Architecture](docs/ARCHITECTURE.md) — components, request flow, and trust boundaries.
-- [Threat model](docs/THREAT_MODEL.md) — attacker capabilities, assumptions, and out-of-scope cases.
-- [Security properties](docs/SECURITY_PROPERTIES.md) — precise properties and how to falsify them.
-- [Research proposal](docs/RESEARCH_PROPOSAL.md) — question, hypothesis, contributions, and method.
-- [Experiment plan](docs/EXPERIMENT_PLAN.md) — baselines, attack suite, metrics, and controls.
-- [Limitations](docs/LIMITATIONS.md) — current gaps, residual risks, and claim discipline.
+If a check fails, the adapter is not called. The gateway consumes the request ID before adapter invocation; if the adapter fails after receiving the request, that ID remains consumed to avoid accidental duplicate execution.
 
 ## Quick start
 
@@ -105,9 +92,20 @@ python -m pip install -e ".[dev]"
 pytest -v
 ```
 
+See [Architecture](docs/ARCHITECTURE.md) for the design and [Threat Model](docs/THREAT_MODEL.md) for assumptions.
+
+## Research and design documents
+
+- [Architecture](docs/ARCHITECTURE.md) — components, request flow, and trust boundaries.
+- [Threat model](docs/THREAT_MODEL.md) — attacker capabilities, assumptions, and out-of-scope cases.
+- [Security properties](docs/SECURITY_PROPERTIES.md) — properties and falsification tests.
+- [Research proposal](docs/RESEARCH_PROPOSAL.md) — question, hypothesis, contributions, and method.
+- [Experiment plan](docs/EXPERIMENT_PLAN.md) — baselines, attack suite, metrics, and controls.
+- [Limitations](docs/LIMITATIONS.md) — current gaps, residual risks, and claim discipline.
+
 ## Security and responsible use
 
-ChainGuard is an **early-stage research prototype**, not a production security product. The identity and revocation registries are currently in-memory. There is no runtime gateway, durable replay protection, distributed trust service, or production key management.
+ChainGuard remains an **early-stage research prototype**, not a production security product. Identity, revocation, and replay state are in-memory and process-local. There is no durable distributed consistency model, production key management, or proof that every deployment path is forced through the gateway.
 
 Do not use this version to protect real accounts, funds, credentials, sensitive data, or production systems. Do not commit private keys, API tokens, or secrets. Security claims must always name the tested threat model and assumptions.
 
@@ -123,4 +121,4 @@ Do not use this version to protect real accounts, funds, credentials, sensitive 
 
 ## License
 
-The package metadata currently declares the MIT License. A complete license file should be added after the project owner confirms the intended licensing terms.
+MIT. See [LICENSE](LICENSE).
