@@ -63,7 +63,7 @@ The result does **not** establish that every production deployment is exploitabl
 4. **Service-side authorization:** move the final check to the protected service, close to the side effect. This is the strongest practical boundary when the service can enforce it.
 5. **Idempotency and outcome handling:** separately address uncertain remote outcomes; replay prevention does not make remote execution exactly-once.
 
-No mitigation is implemented by this experiment. A future change should first define the desired consistency contract (for example, whether an operation already admitted before revocation may finish), then test it against concurrent requests and the actual adapter boundary.
+No mitigation is implemented by this experiment. The required semantics must be selected before implementation; see [Revocation consistency contract](REVOCATION_CONSISTENCY.md) for admission ordering, dispatch ordering, and completion-barrier alternatives.
 
 ## Reproducibility and limitations
 
