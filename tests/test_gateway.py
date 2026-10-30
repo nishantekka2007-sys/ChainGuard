@@ -192,3 +192,24 @@ def test_request_id_stays_consumed_if_adapter_raises(environment):
         gateway.execute(
             chain, valid_request("uncertain-outcome"), RecordingAdapter()
         )
+
+
+def test_concurrent_replay_allows_only_one_adapter_execution(environment):
+    from concurrent.futures import ThreadPoolExecutor
+
+    gateway, _, _, _, _, chain = environment
+    adapter = RecordingAdapter()
+
+    def attempt():
+        try:
+            gateway.execute(chain, valid_request("concurrent-request"), adapter)
+            return "allowed"
+        except AuthorizationError:
+            return "rejected"
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        outcomes = list(pool.map(lambda _: attempt(), range(8)))
+
+    assert outcomes.count("allowed") == 1
+    assert outcomes.count("rejected") == 7
+    assert len(adapter.calls) == 1
